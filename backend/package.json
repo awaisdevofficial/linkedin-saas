@@ -1,0 +1,27 @@
+{
+  "name": "linkeidn-saas-backend",
+  "version": "1.0.0",
+  "description": "OAuth backend for LinkedIn SaaS",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "automation": "node automation.js",
+    "dev:automation": "node --watch automation.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.1",
+    "axios": "^1.7.7",
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "node-cron": "^3.0.3",
+    "openai": "^4.73.0",
+    "rss-parser": "^3.13.0",
+    "sharp": "^0.33.5",
+    "uuid": "^10.0.0"
+  }
+}
