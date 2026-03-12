@@ -504,7 +504,14 @@ app.post('/api/generate-image-for-post', async (req, res) => {
       });
     }
     const imageUrl = await openaiService.generateImage(visualPrompt);
-    if (!imageUrl) return res.status(500).json({ error: 'Image generation failed' });
+    if (!imageUrl) {
+      logger.api('generate_image_for_post_skipped', { postId, reason: 'no_image_url' });
+      return res.status(503).json({
+        error: 'Image generation unavailable',
+        code: 'IMAGE_SERVICE_UNAVAILABLE',
+        message: 'Image generation is temporarily unavailable. Please ensure OPENAI_API_KEY is set and valid on the server.',
+      });
+    }
     const mediaUrl = await imageService.processAndUploadImage(user.id, imageUrl);
     if (!mediaUrl) return res.status(500).json({ error: 'Image upload failed' });
     await supabaseService.updatePost(postId, {
@@ -517,6 +524,14 @@ app.post('/api/generate-image-for-post', async (req, res) => {
     return res.status(200).json({ success: true, media_url: mediaUrl });
   } catch (e) {
     logger.api('generate_image_for_post_error', { postId: req.body?.postId, error: e.message });
+    const isAuthOrConfig = /OPENAI|API key|401|not initialized/i.test(e.message || '');
+    if (isAuthOrConfig) {
+      return res.status(503).json({
+        error: 'Image generation unavailable',
+        code: 'IMAGE_SERVICE_UNAVAILABLE',
+        message: 'Image generation requires a valid OpenAI API key on the server.',
+      });
+    }
     return res.status(500).json({ error: e.message || 'Generate image for post failed' });
   }
 });
