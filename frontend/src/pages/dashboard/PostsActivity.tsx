@@ -58,6 +58,7 @@ type Post = {
   posted: boolean;
   media_url: string | null;
   video_url?: string | null;
+  publish_with_video?: boolean;
   created_at: string;
   scheduled_at: string | null;
 };
@@ -98,7 +99,7 @@ const PostsActivity = () => {
       const [postsRes, profileRes] = await Promise.all([
         client
           .from('posts')
-          .select('id, hook, content, hashtags, status, posted, media_url, video_url, created_at, scheduled_at')
+          .select('id, hook, content, hashtags, status, posted, media_url, video_url, publish_with_video, created_at, scheduled_at')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false }),
         client.from('profiles').select('avatar_url').eq('id', user.id).maybeSingle(),
@@ -127,7 +128,7 @@ const PostsActivity = () => {
         () => {
           client
             .from('posts')
-            .select('id, hook, content, hashtags, status, posted, media_url, video_url, created_at, scheduled_at')
+            .select('id, hook, content, hashtags, status, posted, media_url, video_url, publish_with_video, created_at, scheduled_at')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .then((res) => setPosts((res.data as Post[]) || []));
@@ -827,6 +828,47 @@ const PostsActivity = () => {
                   </div>
                 </div>
 
+                {/* Publish with Image or Video (when both exist) */}
+                {!viewPost.posted && viewPost.media_url && viewPost.video_url && (
+                  <div className="mt-3 p-3 rounded-xl bg-[#f8fafc] border border-[#e2e8f0]">
+                    <Label className="text-sm font-medium text-[#334155] block mb-2">Publish to LinkedIn with</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="publish-media"
+                          checked={!viewPost.publish_with_video}
+                          onChange={async () => {
+                            if (!supabase || !user) return;
+                            await supabase.from('posts').update({ publish_with_video: false }).eq('id', viewPost.id).eq('user_id', user.id);
+                            setViewPost((p) => (p ? { ...p, publish_with_video: false } : null));
+                            setPosts((prev) => prev.map((p) => (p.id === viewPost.id ? { ...p, publish_with_video: false } : p)));
+                          }}
+                          className="rounded-full"
+                        />
+                        <Image className="w-4 h-4" />
+                        <span className="text-sm">Image</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="publish-media"
+                          checked={!!viewPost.publish_with_video}
+                          onChange={async () => {
+                            if (!supabase || !user) return;
+                            await supabase.from('posts').update({ publish_with_video: true }).eq('id', viewPost.id).eq('user_id', user.id);
+                            setViewPost((p) => (p ? { ...p, publish_with_video: true } : null));
+                            setPosts((prev) => prev.map((p) => (p.id === viewPost.id ? { ...p, publish_with_video: true } : p)));
+                          }}
+                          className="rounded-full"
+                        />
+                        <Video className="w-4 h-4" />
+                        <span className="text-sm">Video</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
                 {/* PostPilot actions footer */}
                 <div className="mt-4 flex justify-end gap-3 flex-wrap">
                   <Button
@@ -838,19 +880,35 @@ const PostsActivity = () => {
                   </Button>
                   {!viewPost.posted && (
                     <>
-                      <Button
-                        variant="outline"
-                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
-                        onClick={() => handleRegenerateImage(viewPost.id)}
-                        disabled={!!actionLoading}
-                      >
-                        {actionLoading === viewPost.id ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                        )}
-                        Regenerate picture
-                      </Button>
+                      {!viewPost.media_url ? (
+                        <Button
+                          variant="outline"
+                          className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                          onClick={() => handleGenerateImage(viewPost.id)}
+                          disabled={!!actionLoading}
+                        >
+                          {actionLoading === viewPost.id ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Image className="w-4 h-4 mr-2" />
+                          )}
+                          Generate image
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                          onClick={() => handleRegenerateImage(viewPost.id)}
+                          disabled={!!actionLoading}
+                        >
+                          {actionLoading === viewPost.id ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                          )}
+                          Regenerate picture
+                        </Button>
+                      )}
                       {viewPost.media_url && (
                         <Button
                           variant="outline"
@@ -907,10 +965,44 @@ const PostsActivity = () => {
                   ? `How would you like to publish "${approvePost.hook || 'Untitled'}"?`
                   : `Choose when to publish "${approvePost.hook || 'Untitled'}"`}
               </p>
-              {approvePost?.video_url && (
-                <p className="text-sm text-[#1e40af] bg-[#eff6ff] rounded-lg px-3 py-2 mb-3">
-                  This post has a video — it will be posted to LinkedIn when you publish.
-                </p>
+              {approvePost?.media_url && approvePost?.video_url && (
+                <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e2e8f0]">
+                  <Label className="text-sm font-medium text-[#334155] block mb-2">Publish to LinkedIn with</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="approve-publish-media"
+                        checked={!approvePost.publish_with_video}
+                        onChange={async () => {
+                          if (!supabase || !user) return;
+                          await supabase.from('posts').update({ publish_with_video: false }).eq('id', approvePost.id).eq('user_id', user.id);
+                          setApprovePost((p) => (p ? { ...p, publish_with_video: false } : null));
+                          setPosts((prev) => prev.map((p) => (p.id === approvePost.id ? { ...p, publish_with_video: false } : p)));
+                        }}
+                        className="rounded-full"
+                      />
+                      <Image className="w-4 h-4" />
+                      <span className="text-sm">Image</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="approve-publish-media"
+                        checked={!!approvePost.publish_with_video}
+                        onChange={async () => {
+                          if (!supabase || !user) return;
+                          await supabase.from('posts').update({ publish_with_video: true }).eq('id', approvePost.id).eq('user_id', user.id);
+                          setApprovePost((p) => (p ? { ...p, publish_with_video: true } : null));
+                          setPosts((prev) => prev.map((p) => (p.id === approvePost.id ? { ...p, publish_with_video: true } : p)));
+                        }}
+                        className="rounded-full"
+                      />
+                      <Video className="w-4 h-4" />
+                      <span className="text-sm">Video</span>
+                    </label>
+                  </div>
+                </div>
               )}
               {approvePost.status === 'pending' && (
                 <div className="flex gap-4">

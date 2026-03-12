@@ -240,7 +240,7 @@ export async function getPendingMediaPosts(userId) {
       .is('media_url', null)
       .eq('is_checked', false);
     if (error) return [];
-    return (data || []).filter((p) => p.visual_prompt != null);
+    return (data || []).filter((p) => p.visual_prompt != null || (p.hook && String(p.hook).trim()) || (p.content && String(p.content).trim()));
   } catch (e) {
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getPendingMediaPosts', userId, error: e.message }));
     return [];

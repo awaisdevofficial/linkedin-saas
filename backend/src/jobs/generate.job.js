@@ -83,10 +83,11 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
               logger.automation('generate_job_post_created', { userId, postId });
             }
 
-            // Generate and attach image via Freepik (if user has API key)
-            if (postId && result.visual_prompt && settings?.freepik_api_key?.trim()) {
+            // Auto-generate image only (no video). Prompt = post caption/content.
+            const imagePrompt = openai.buildPromptFromPostContent(result.headline_hook || result.hook || '', result.post_copy || result.content || '') || openai.buildImagePromptFromVisual(result.visual_prompt);
+            if (postId && imagePrompt && settings?.freepik_api_key?.trim()) {
               try {
-                const prompt = openai.buildImagePromptFromVisual(result.visual_prompt);
+                const prompt = imagePrompt;
                 const imageUrl = await freepik.generateImage(settings.freepik_api_key.trim(), prompt, 'widescreen_16_9');
                 if (imageUrl) {
                   const mediaUrl = await imageService.processAndUploadImage(userId, imageUrl);

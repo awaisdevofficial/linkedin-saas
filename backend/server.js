@@ -466,12 +466,12 @@ app.post('/api/regenerate-image', async (req, res) => {
     const imageService = await import('./src/services/image.service.js');
     const post = await supabaseService.getPostByIdAndUser(postId, user.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
-    if (!post.visual_prompt) return res.status(400).json({ error: 'Post has no visual prompt' });
+    const prompt = openaiService.buildPromptFromPostContent(post.hook || '', post.content || '') || openaiService.buildImagePromptFromVisual(post.visual_prompt);
+    if (!prompt) return res.status(400).json({ error: 'Add a hook or content to the post to generate an image' });
     const settings = await supabaseService.getUserContentSettings(user.id);
     const apiKey = settings?.freepik_api_key?.trim();
     if (!apiKey) return res.status(503).json({ error: 'Add your Freepik API key in Automation Settings.' });
     const freepikService = await import('./src/services/freepik.service.js');
-    const prompt = openaiService.buildImagePromptFromVisual(post.visual_prompt);
     const imageUrl = await freepikService.generateImage(apiKey, prompt, 'widescreen_16_9');
     if (!imageUrl) return res.status(500).json({ error: 'Image generation failed' });
     const mediaUrl = await imageService.processAndUploadImage(user.id, imageUrl);
@@ -490,7 +490,7 @@ app.post('/api/regenerate-image', async (req, res) => {
   }
 });
 
-// POST /api/generate-image-for-post — generate image via Freepik Mystic (user's API key)
+// POST /api/generate-image-for-post — generate image via Freepik (prompt = post caption/content)
 app.post('/api/generate-image-for-post', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
@@ -514,13 +514,8 @@ app.post('/api/generate-image-for-post', async (req, res) => {
     }
     const post = await supabaseService.getPostByIdAndUser(postId, user.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
-    let visualPrompt = post.visual_prompt;
-    if (!visualPrompt || typeof visualPrompt !== 'object') {
-      visualPrompt = await openaiService.generateVisualPromptFromPost(post.hook || '', post.content || '');
-      await supabaseService.updatePost(postId, { visual_prompt: visualPrompt, updated_at: new Date().toISOString() });
-    }
-    const prompt = openaiService.buildImagePromptFromVisual(visualPrompt);
-    if (!prompt) return res.status(400).json({ error: 'No visual prompt' });
+    const prompt = openaiService.buildPromptFromPostContent(post.hook || '', post.content || '');
+    if (!prompt) return res.status(400).json({ error: 'Add a hook or content to the post to generate an image' });
     const imageUrl = await freepikService.generateImage(apiKey, prompt, 'widescreen_16_9');
     if (!imageUrl) {
       logger.api('generate_image_for_post_skipped', { postId, reason: 'no_image_url' });
@@ -546,7 +541,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
   }
 });
 
-// POST /api/generate-video-for-post — generate video from post image via Freepik Kling v2
+// POST /api/generate-video-for-post — generate video from post image via Freepik Kling v2 (prompt = post caption/content)
 app.post('/api/generate-video-for-post', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
@@ -556,6 +551,7 @@ app.post('/api/generate-video-for-post', async (req, res) => {
     const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
+    const openaiService = await import('./src/services/openai.service.js');
     const freepikService = await import('./src/services/freepik.service.js');
     const imageService = await import('./src/services/image.service.js');
     const settings = await supabaseService.getUserContentSettings(user.id);
@@ -574,7 +570,7 @@ app.post('/api/generate-video-for-post', async (req, res) => {
       return res.status(400).json({ error: 'Post must have an image first. Generate an image, then generate video.' });
     }
     const duration = req.body?.duration === '10' ? '10' : '5';
-    const motionPrompt = req.body?.prompt || 'Subtle professional motion, suitable for LinkedIn.';
+    const motionPrompt = openaiService.buildPromptFromPostContent(post.hook || '', post.content || '') || 'Subtle professional motion, suitable for LinkedIn.';
     const videoUrl = await freepikService.generateVideo(apiKey, imageUrl, duration, motionPrompt);
     if (!videoUrl) {
       return res.status(503).json({
@@ -679,7 +675,7 @@ app.post('/api/publish-now', async (req, res) => {
       return res.status(400).json({ error: 'LinkedIn person URN missing; reconnect in Settings' });
     }
     // If no media yet, try generating it now (Freepik)
-    if (!post.media_url && post.visual_prompt) {
+    if (!post.media_url && (post.hook || post.content || post.visual_prompt)) {
       try {
         const contentSettings = await supabaseService.getUserContentSettings(user.id);
         const freepikKey = contentSettings?.freepik_api_key?.trim();
@@ -687,7 +683,10 @@ app.post('/api/publish-now', async (req, res) => {
           const openaiService = await import('./src/services/openai.service.js');
           const freepikService = await import('./src/services/freepik.service.js');
           const { processAndUploadImage } = await import('./src/services/image.service.js');
-          const prompt = openaiService.buildImagePromptFromVisual(post.visual_prompt);
+          const prompt = openaiService.buildPromptFromPostContent(post.hook || '', post.content || '') || openaiService.buildImagePromptFromVisual(post.visual_prompt);
+          if (!prompt) {
+            logger.api('publish_now_image_skipped', { postId, reason: 'no_prompt' });
+          } else {
           const imageUrl = await freepikService.generateImage(freepikKey, prompt, 'widescreen_16_9');
           if (imageUrl) {
             const mediaUrl = await processAndUploadImage(user.id, imageUrl);
@@ -696,17 +695,19 @@ app.post('/api/publish-now', async (req, res) => {
               post.media_url = mediaUrl;
             }
           }
+          }
         }
       } catch (imgErr) {
         logger.api('publish_now_image_skipped', { postId, error: imgErr.message });
       }
     }
+    const useVideo = post.publish_with_video && post.video_url;
     const postUrn = await linkedinService.postToLinkedIn(credentials, {
       hook: post.hook,
       content: post.content || '',
       hashtags: post.hashtags || [],
-      mediaUrl: post.media_url || null,
-      videoUrl: post.video_url || null,
+      mediaUrl: useVideo ? null : (post.media_url || null),
+      videoUrl: useVideo ? post.video_url : null,
     });
     await supabaseService.updatePost(postId, {
       posted: true,

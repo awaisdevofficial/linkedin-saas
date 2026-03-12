@@ -224,3 +224,14 @@ export function buildImagePromptFromVisual(visualPrompt) {
   const v = visualPrompt;
   return `${v.visual_concept || 'Professional graphic'}. Style: ${v.design_style || 'minimal, clean, professional'}. Text overlay: "${v.headline_text || ''}". Professional LinkedIn post image. Dark background. Clean typography. No people. No faces. Minimalist.`;
 }
+
+/**
+ * Build prompt from post caption/content for image and video generation.
+ * Used as the single source for both manual and auto image; and for video.
+ */
+export function buildPromptFromPostContent(hook, content) {
+  const parts = [hook, content].filter(Boolean).map((s) => String(s).trim());
+  const caption = parts.join('\n\n').trim();
+  if (!caption) return '';
+  return `Professional LinkedIn post. Caption: ${caption}. Clean, minimal, no people, no faces.`;
+}

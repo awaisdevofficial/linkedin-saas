@@ -29,12 +29,13 @@ export async function runPublishJob() {
           personUrn: user.person_urn,
         };
 
+        const useVideo = post.publish_with_video && post.video_url;
         const postUrn = await linkedin.postToLinkedIn(credentials, {
           hook: post.hook,
           content: post.content,
           hashtags: post.hashtags || [],
-          mediaUrl: post.media_url || null,
-          videoUrl: post.video_url || null,
+          mediaUrl: useVideo ? null : (post.media_url || null),
+          videoUrl: useVideo ? post.video_url : null,
         });
 
         await supabase.updatePost(post.id, {

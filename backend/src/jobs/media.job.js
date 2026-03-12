@@ -31,7 +31,11 @@ export async function runMediaJob() {
         for (const post of posts) {
           try {
             logger.automation('media_job_step', { postId: post.id, step: 'generateImage' });
-            const prompt = openai.buildImagePromptFromVisual(post.visual_prompt);
+            const prompt = openai.buildPromptFromPostContent(post.hook || '', post.content || '') || openai.buildImagePromptFromVisual(post.visual_prompt);
+            if (!prompt) {
+              logger.automation('media_job_skip', { postId: post.id, step: 'generateImage', reason: 'no_prompt' });
+              continue;
+            }
             const imageUrl = await freepik.generateImage(apiKey, prompt, 'widescreen_16_9');
             if (!imageUrl) {
               logger.automation('media_job_skip', { postId: post.id, step: 'generateImage', reason: 'null' });
