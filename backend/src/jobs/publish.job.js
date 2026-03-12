@@ -29,7 +29,8 @@ export async function runPublishJob() {
           personUrn: user.person_urn,
         };
 
-        const useVideo = post.publish_with_video && post.video_url;
+        const useVideo = !!(post.publish_with_video && post.video_url);
+        if (useVideo) logger.automation('publish_job_with_video', { userId, postId: post.id });
         const postUrn = await linkedin.postToLinkedIn(credentials, {
           hook: post.hook,
           content: post.content,

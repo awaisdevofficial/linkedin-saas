@@ -563,6 +563,22 @@ const PostsActivity = () => {
                     )}
                   </Button>
                 )}
+                {post.media_url && !post.posted && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                    onClick={() => handleGenerateVideo(post.id)}
+                    disabled={!!actionLoading}
+                    title="Generate video"
+                  >
+                    {actionLoading === post.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Video className="w-4 h-4" />
+                    )}
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="rounded-full">

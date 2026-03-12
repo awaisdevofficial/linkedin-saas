@@ -701,7 +701,8 @@ app.post('/api/publish-now', async (req, res) => {
         logger.api('publish_now_image_skipped', { postId, error: imgErr.message });
       }
     }
-    const useVideo = post.publish_with_video && post.video_url;
+    const useVideo = !!(post.publish_with_video && post.video_url);
+    if (useVideo) logger.api('publish_now_with_video', { postId, videoUrl: post.video_url?.slice(0, 80) });
     const postUrn = await linkedinService.postToLinkedIn(credentials, {
       hook: post.hook,
       content: post.content || '',

@@ -59,6 +59,7 @@ async function uploadImageAsset(credentials, mediaUrl) {
 /**
  * Upload video via LinkedIn Videos API (initializeUpload, upload parts, finalizeUpload).
  * Returns urn:li:video:xxx for use with /rest/posts.
+ * Note: LinkedIn sometimes returns empty uploadToken; we still call finalize with it.
  * @see https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/videos-api
  */
 async function uploadVideoAsset(credentials, videoUrl) {
@@ -73,9 +74,11 @@ async function uploadVideoAsset(credentials, videoUrl) {
     'LinkedIn-Version': '202503',
   };
 
+  console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_fetch_start', url: videoUrl?.slice(0, 80) }));
   const videoRes = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 120000 });
   const buffer = Buffer.from(videoRes.data);
   const fileSizeBytes = buffer.length;
+  console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_fetch_done', fileSizeBytes }));
 
   const initRes = await axios.post(
     'https://api.linkedin.com/rest/videos?action=initializeUpload',
@@ -92,15 +95,18 @@ async function uploadVideoAsset(credentials, videoUrl) {
 
   const value = initRes.data?.value;
   const videoUrn = value?.video;
-  const uploadToken = value?.uploadToken;
+  const uploadToken = value?.uploadToken ?? '';
   const instructions = value?.uploadInstructions || [];
 
-  if (!videoUrn || !uploadToken || !instructions.length) {
-    throw new Error(`Video initializeUpload failed: ${JSON.stringify(initRes.data)}`);
+  if (!videoUrn || !instructions.length) {
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_init_failed', response: initRes.data }));
+    throw new Error(`Video initializeUpload failed: need video URN and uploadInstructions. Response: ${JSON.stringify(initRes.data)}`);
   }
+  console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_init_ok', videoUrn, parts: instructions.length, hasToken: !!uploadToken }));
 
   const uploadedPartIds = [];
-  for (const part of instructions) {
+  for (let i = 0; i < instructions.length; i++) {
+    const part = instructions[i];
     const start = part.firstByte ?? 0;
     const end = (part.lastByte ?? fileSizeBytes - 1) + 1;
     const chunk = buffer.subarray(start, end);
@@ -113,13 +119,22 @@ async function uploadVideoAsset(credentials, videoUrl) {
       maxContentLength: Infinity,
     });
     if (putRes.status < 200 || putRes.status >= 300) {
+      console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_part_failed', partIndex: i, status: putRes.status, data: putRes.data }));
       throw new Error(`Video part upload failed: ${putRes.status} ${JSON.stringify(putRes.data)}`);
     }
-    const etag = putRes.headers?.etag?.replace(/^"|"$/g, '') || putRes.headers?.['etag']?.replace(/^"|"$/g, '');
+    const rawEtag = putRes.headers?.etag || putRes.headers?.ETag || putRes.headers?.['etag'];
+    const etag = rawEtag ? String(rawEtag).replace(/^"|"$/g, '') : null;
     if (etag) uploadedPartIds.push(etag);
+    else console.warn(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_part_no_etag', partIndex: i, headersKeys: Object.keys(putRes.headers || {}) }));
   }
 
-  await axios.post(
+  if (uploadedPartIds.length === 0) {
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_no_part_ids', message: 'No ETags collected from part uploads' }));
+    throw new Error('Video upload: no part IDs (ETags) received from LinkedIn part uploads');
+  }
+
+  console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_finalize_start', videoUrn, partCount: uploadedPartIds.length }));
+  const finalizeRes = await axios.post(
     'https://api.linkedin.com/rest/videos?action=finalizeUpload',
     {
       finalizeUploadRequest: {
@@ -130,6 +145,11 @@ async function uploadVideoAsset(credentials, videoUrl) {
     },
     { headers }
   );
+  if (finalizeRes.status < 200 || finalizeRes.status >= 300) {
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_finalize_failed', status: finalizeRes.status, data: finalizeRes.data }));
+    throw new Error(`Video finalizeUpload failed: ${finalizeRes.status} ${JSON.stringify(finalizeRes.data)}`);
+  }
+  console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_upload_done', videoUrn }));
 
   await new Promise((r) => setTimeout(r, 3000));
   return videoUrn;
@@ -151,15 +171,18 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
 
   if (videoUrl && videoUrl.trim()) {
     try {
+      console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'postToLinkedIn_using_video' }));
       mediaUrn = await uploadVideoAsset(credentials, videoUrl.trim());
     } catch (e) {
       const msg = e.response?.data ? JSON.stringify(e.response.data) : e.message;
-      console.warn(JSON.stringify({
+      console.error(JSON.stringify({
         timestamp: new Date().toISOString(),
         service: 'linkedin',
-        action: 'uploadVideoAsset',
+        action: 'uploadVideoAsset_failed',
         error: msg,
+        stack: e.stack?.slice(0, 300),
       }));
+      throw e;
     }
   }
   if (!mediaUrn && mediaUrl && mediaUrl.trim()) {
