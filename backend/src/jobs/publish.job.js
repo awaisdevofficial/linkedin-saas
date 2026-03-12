@@ -34,6 +34,7 @@ export async function runPublishJob() {
           content: post.content,
           hashtags: post.hashtags || [],
           mediaUrl: post.media_url || null,
+          videoUrl: post.video_url || null,
         });
 
         await supabase.updatePost(post.id, {

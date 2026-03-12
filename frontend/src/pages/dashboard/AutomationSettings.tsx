@@ -225,6 +225,9 @@ const AutomationSettings = () => {
                   className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] font-mono text-sm"
                 />
               </div>
+              <div className="rounded-xl bg-[#eff6ff] border border-[#bfdbfe] p-3 text-sm text-[#1e40af]">
+                When a post has a generated video, the video will be posted to LinkedIn when you publish (manually or via schedule).
+              </div>
               <Separator className="bg-[#e2e8f0]" />
               <div className="space-y-3">
                 <Label className="text-sm font-medium text-[#334155]">Niche</Label>

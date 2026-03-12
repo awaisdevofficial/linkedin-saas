@@ -56,7 +56,86 @@ async function uploadImageAsset(credentials, mediaUrl) {
   return imageUrn; // urn:li:image:xxx
 }
 
-export async function postToLinkedIn(credentials, { hook, content, hashtags, mediaUrl }) {
+/**
+ * Upload video via LinkedIn Videos API (initializeUpload, upload parts, finalizeUpload).
+ * Returns urn:li:video:xxx for use with /rest/posts.
+ * @see https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/videos-api
+ */
+async function uploadVideoAsset(credentials, videoUrl) {
+  const personUrn = credentials.personUrn.startsWith('urn:')
+    ? credentials.personUrn
+    : `urn:li:person:${credentials.personUrn}`;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${credentials.accessToken}`,
+    'X-Restli-Protocol-Version': '2.0.0',
+    'LinkedIn-Version': '202503',
+  };
+
+  const videoRes = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 120000 });
+  const buffer = Buffer.from(videoRes.data);
+  const fileSizeBytes = buffer.length;
+
+  const initRes = await axios.post(
+    'https://api.linkedin.com/rest/videos?action=initializeUpload',
+    {
+      initializeUploadRequest: {
+        owner: personUrn,
+        fileSizeBytes,
+        uploadCaptions: false,
+        uploadThumbnail: false,
+      },
+    },
+    { headers }
+  );
+
+  const value = initRes.data?.value;
+  const videoUrn = value?.video;
+  const uploadToken = value?.uploadToken;
+  const instructions = value?.uploadInstructions || [];
+
+  if (!videoUrn || !uploadToken || !instructions.length) {
+    throw new Error(`Video initializeUpload failed: ${JSON.stringify(initRes.data)}`);
+  }
+
+  const uploadedPartIds = [];
+  for (const part of instructions) {
+    const start = part.firstByte ?? 0;
+    const end = (part.lastByte ?? fileSizeBytes - 1) + 1;
+    const chunk = buffer.subarray(start, end);
+    const putRes = await axios.put(part.uploadUrl, chunk, {
+      headers: {
+        Authorization: `Bearer ${credentials.accessToken}`,
+        'Content-Type': 'application/octet-stream',
+      },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    });
+    if (putRes.status < 200 || putRes.status >= 300) {
+      throw new Error(`Video part upload failed: ${putRes.status} ${JSON.stringify(putRes.data)}`);
+    }
+    const etag = putRes.headers?.etag?.replace(/^"|"$/g, '') || putRes.headers?.['etag']?.replace(/^"|"$/g, '');
+    if (etag) uploadedPartIds.push(etag);
+  }
+
+  await axios.post(
+    'https://api.linkedin.com/rest/videos?action=finalizeUpload',
+    {
+      finalizeUploadRequest: {
+        video: videoUrn,
+        uploadToken,
+        uploadedPartIds,
+      },
+    },
+    { headers }
+  );
+
+  await new Promise((r) => setTimeout(r, 3000));
+  return videoUrn;
+}
+
+export async function postToLinkedIn(credentials, { hook, content, hashtags, mediaUrl, videoUrl }) {
   if (!credentials.personUrn) {
     throw new Error('personUrn is missing — reconnect LinkedIn in Settings');
   }
@@ -68,11 +147,24 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
   const text = [hook, content, hashtagText].filter(Boolean).join('\n\n');
 
   const personUrn = credentials.personUrn.startsWith('urn:') ? credentials.personUrn : `urn:li:person:${credentials.personUrn}`;
-  let imageUrn = null;
+  let mediaUrn = null;
 
-  if (mediaUrl && mediaUrl.trim()) {
+  if (videoUrl && videoUrl.trim()) {
     try {
-      imageUrn = await uploadImageAsset(credentials, mediaUrl.trim());
+      mediaUrn = await uploadVideoAsset(credentials, videoUrl.trim());
+    } catch (e) {
+      const msg = e.response?.data ? JSON.stringify(e.response.data) : e.message;
+      console.warn(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        service: 'linkedin',
+        action: 'uploadVideoAsset',
+        error: msg,
+      }));
+    }
+  }
+  if (!mediaUrn && mediaUrl && mediaUrl.trim()) {
+    try {
+      mediaUrn = await uploadImageAsset(credentials, mediaUrl.trim());
     } catch (e) {
       const msg = e.response?.data ? JSON.stringify(e.response.data) : e.message;
       console.warn(JSON.stringify({
@@ -81,7 +173,6 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
         action: 'uploadImageAsset',
         error: msg,
       }));
-      // continues as text-only post
     }
   }
 
@@ -92,7 +183,7 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
     'LinkedIn-Version': '202503',
   };
 
-  const body = imageUrn ? {
+  const body = mediaUrn ? {
     author: personUrn,
     commentary: text,
     visibility: 'PUBLIC',
@@ -103,8 +194,8 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
     },
     content: {
       media: {
-        altText: hook?.slice(0, 200) || 'Post image',
-        id: imageUrn,
+        altText: hook?.slice(0, 200) || 'Post',
+        id: mediaUrn,
       },
     },
     lifecycleState: 'PUBLISHED',
@@ -134,7 +225,7 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
       service: 'linkedin',
       action: 'postToLinkedIn',
       urn: urnToStore,
-      hasImage: !!imageUrn,
+      hasMedia: !!mediaUrn,
     }));
 
     return urnToStore;
@@ -144,7 +235,7 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
       timestamp: new Date().toISOString(),
       service: 'linkedin',
       action: 'postToLinkedIn',
-      hasImage: !!imageUrn,
+      hasMedia: !!mediaUrn,
       error: detail,
     }));
     throw new Error(`LinkedIn postToLinkedIn failed: ${detail}`);

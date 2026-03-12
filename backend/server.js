@@ -706,6 +706,7 @@ app.post('/api/publish-now', async (req, res) => {
       content: post.content || '',
       hashtags: post.hashtags || [],
       mediaUrl: post.media_url || null,
+      videoUrl: post.video_url || null,
     });
     await supabaseService.updatePost(postId, {
       posted: true,

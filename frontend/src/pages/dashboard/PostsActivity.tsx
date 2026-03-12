@@ -907,6 +907,11 @@ const PostsActivity = () => {
                   ? `How would you like to publish "${approvePost.hook || 'Untitled'}"?`
                   : `Choose when to publish "${approvePost.hook || 'Untitled'}"`}
               </p>
+              {approvePost?.video_url && (
+                <p className="text-sm text-[#1e40af] bg-[#eff6ff] rounded-lg px-3 py-2 mb-3">
+                  This post has a video — it will be posted to LinkedIn when you publish.
+                </p>
+              )}
               {approvePost.status === 'pending' && (
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
