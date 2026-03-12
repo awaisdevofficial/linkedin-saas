@@ -1,253 +1,186 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
-  FileText,
-  Heart,
+  Calendar,
+  MessageSquare,
   Settings,
+  Zap,
+  Search,
+  Bell,
   LogOut,
   Menu,
-  Bell,
-  Search,
   ChevronDown,
-  Loader2,
-  AlertCircle,
-  ArrowRight,
 } from 'lucide-react';
-import { useAuth } from '../lib/auth-context';
-import { supabase, getAvatarDisplayUrl } from '../lib/supabase';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu';
+} from '@/components/ui/dropdown-menu';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 
-const sidebarItems = [
+const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-  { icon: FileText, label: 'Posts', href: '/dashboard/posts' },
-  { icon: Heart, label: 'Comments', href: '/dashboard/comments' },
+  { icon: Calendar, label: 'Posts', href: '/dashboard/posts/activity' },
+  { icon: MessageSquare, label: 'Comments', href: '/dashboard/comments/activity' },
+  { icon: Zap, label: 'Automation', href: '/dashboard/automation' },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ];
 
-export default function DashboardLayout() {
+const DashboardLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [hasLiAtCookie, setHasLiAtCookie] = useState<boolean | null>(null);
-  const [profile, setProfile] = useState<{ full_name: string; avatar_url: string | null } | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLinkedInConnected, setIsLinkedInConnected] = useState(false);
+  const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null);
 
-  // Load profile (name, avatar) for header display
   useEffect(() => {
-    if (!user?.id) {
-      setProfile(null);
-      return;
-    }
-    let cancelled = false;
-    const load = async () => {
-      const { data } = await supabase
+    if (!supabase || !user) return;
+    const client = supabase;
+    const fetchConnection = async () => {
+      const { data } = await client
+        .from('linkedin_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      setIsLinkedInConnected(!!data);
+    };
+    const fetchProfile = async () => {
+      const { data } = await client
         .from('profiles')
         .select('full_name, avatar_url')
         .eq('id', user.id)
         .maybeSingle();
-      if (!cancelled && data) {
-        setProfile({
-          full_name: data.full_name ?? '',
-          avatar_url: data.avatar_url ?? null,
-        });
-      }
+      setProfile(data);
     };
-    load();
-    const channel = supabase
-      .channel('layout-profile')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, () => {
-        load();
-      })
-      .subscribe();
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
-
-  // Check if user has set li_at cookie (for posting, engagement, feed)
-  useEffect(() => {
-    if (!user?.id) {
-      setHasLiAtCookie(null);
-      return;
-    }
-    let cancelled = false;
-    const check = async () => {
-      const { data } = await supabase
-        .from('linkedin_connections')
-        .select('li_at_cookie')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (!cancelled && data) {
-        setHasLiAtCookie(!!(data.li_at_cookie && data.li_at_cookie.length > 10));
-      } else {
-        setHasLiAtCookie(false);
-      }
-    };
-    check();
-    const channel = supabase
-      .channel('layout-li_at')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'linkedin_connections', filter: `user_id=eq.${user.id}` }, () => {
-        check();
-      })
-      .subscribe();
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
+    fetchConnection();
+    fetchProfile();
+  }, [user]);
 
   const handleLogout = async () => {
-    setIsSigningOut(true);
     await signOut();
-    setIsSigningOut(false);
-    navigate('/');
+    navigate('/auth/login');
   };
 
-  const displayName = profile?.full_name?.trim() || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
-  const userInitials = displayName
-    ? displayName.split(/\s+/).map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-    : user?.email?.[0]?.toUpperCase() || 'U';
-  const avatarUrl = getAvatarDisplayUrl(profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture);
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+
+  const SidebarContent = () => (
+    <>
+      <div className="flex items-center gap-2 px-4 py-6">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#2D5AF6] to-[#27C696] flex items-center justify-center">
+          <span className="text-white font-bold text-sm">PP</span>
+        </div>
+        <span className="font-semibold text-lg text-[#10153E]">PostPilot</span>
+      </div>
+
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {navItems.map((item) => {
+          const isActive =
+            location.pathname === item.href ||
+            (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
+          return (
+            <Link
+              key={item.label}
+              to={item.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                isActive
+                  ? 'bg-[#2D5AF6] text-white'
+                  : 'text-[#6B7098] hover:bg-[#F6F8FC] hover:text-[#10153E]'
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="px-3 py-4 border-t border-[#6B7098]/10">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#6B7098] hover:bg-[#F6F8FC] hover:text-[#10153E] transition-all w-full"
+        >
+          <LogOut className="w-5 h-5" />
+          Logout
+        </button>
+      </div>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-[#070A12] flex">
-      {/* Mobile Sidebar Overlay */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-[#0B1022] border-r border-white/[0.06] flex flex-col transition-transform duration-300 lg:translate-x-0 ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        {/* Logo */}
-        <div className="p-6 border-b border-white/[0.06]">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4F6DFF] to-[#27C696] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">LF</span>
-            </div>
-            <span className="text-xl font-semibold text-[#F2F5FF]">PostPilot</span>
-          </Link>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {sidebarItems.map((item) => {
-            const isActive = location.pathname === item.href || (item.href !== '/dashboard' && location.pathname.startsWith(item.href + '/'));
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                onClick={() => setIsSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                  isActive
-                    ? 'bg-[#4F6DFF]/20 text-[#4F6DFF]'
-                    : 'text-[#A7B1D8] hover:bg-white/5 hover:text-[#F2F5FF]'
-                }`}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Logout */}
-        <div className="p-4 border-t border-white/[0.06]">
-          <button
-            onClick={handleLogout}
-            disabled={isSigningOut}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-[#A7B1D8] hover:bg-white/5 hover:text-[#FF6B6B] transition-colors w-full disabled:opacity-50"
-          >
-            {isSigningOut ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <LogOut className="w-5 h-5" />
-            )}
-            <span className="font-medium">{isSigningOut ? 'Signing out...' : 'Logout'}</span>
-          </button>
-        </div>
+    <div className="min-h-screen bg-[#F6F8FC] flex">
+      <aside className="hidden lg:flex w-64 bg-white border-r border-[#6B7098]/10 flex-col fixed h-full">
+        <SidebarContent />
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="sticky top-0 z-30 bg-[#070A12]/80 backdrop-blur-xl border-b border-white/[0.06]">
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4">
-            {/* Left: Mobile menu + Search */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden p-2 -ml-2 text-[#A7B1D8] hover:text-[#F2F5FF] transition-colors"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              
-              <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                <Search className="w-4 h-4 text-[#A7B1D8]" aria-hidden />
-                <input
-                  type="search"
-                  placeholder="Search posts, comments..."
-                  aria-label="Search"
-                  className="bg-transparent text-sm text-[#F2F5FF] placeholder:text-[#A7B1D8]/50 outline-none w-48"
-                />
-              </div>
+      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+        <SheetContent side="left" className="w-64 p-0 bg-white">
+          <SidebarContent />
+        </SheetContent>
+      </Sheet>
+
+      <div className="flex-1 lg:ml-64">
+        <header className="bg-white border-b border-[#6B7098]/10 px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <Sheet>
+              <SheetTrigger asChild className="lg:hidden">
+                <Button variant="ghost" size="icon">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-0 bg-white">
+                <SidebarContent />
+              </SheetContent>
+            </Sheet>
+
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7098]" />
+              <Input
+                type="text"
+                placeholder="Search posts, comments..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-10 rounded-full bg-[#F6F8FC] border-none focus:ring-2 focus:ring-[#2D5AF6]/20"
+              />
             </div>
 
-            {/* Right: Notifications + Profile */}
             <div className="flex items-center gap-3">
-              <button className="relative p-2 rounded-xl text-[#A7B1D8] hover:bg-white/5 hover:text-[#F2F5FF] transition-colors">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF6B6B]" />
+              <button className="relative p-2 rounded-full hover:bg-[#F6F8FC] transition-colors">
+                <Bell className="w-5 h-5 text-[#6B7098]" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-[#2D5AF6] rounded-full" />
               </button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 p-1.5 pr-3 rounded-xl hover:bg-white/5 transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4F6DFF] to-[#27C696] flex items-center justify-center overflow-hidden shrink-0">
-                      {avatarUrl ? (
-                        <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-white font-semibold text-sm">{userInitials}</span>
-                      )}
-                    </div>
-                    <span className="hidden sm:block text-sm text-[#F2F5FF]">{displayName}</span>
-                    <ChevronDown className="w-4 h-4 text-[#A7B1D8]" />
+                  <button className="flex items-center gap-2 p-1.5 rounded-full hover:bg-[#F6F8FC] transition-colors">
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src={avatarUrl} alt="Profile" className="object-cover" />
+                      <AvatarFallback className="bg-[#2D5AF6]/20 text-[#2D5AF6] text-sm font-medium">
+                        {displayName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <ChevronDown className="w-4 h-4 text-[#6B7098] hidden sm:block" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-[#0B1022] border-white/10">
-                  <DropdownMenuItem className="text-[#F2F5FF] focus:bg-white/5 focus:text-[#F2F5FF]">
-                    <Link to="/dashboard/settings" className="flex items-center gap-2 w-full">
-                      <Settings className="w-4 h-4" />
-                      Settings
-                    </Link>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard/settings">Settings</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10" />
-                  <DropdownMenuItem
-                    onClick={handleLogout}
-                    disabled={isSigningOut}
-                    className="text-[#FF6B6B] focus:bg-white/5 focus:text-[#FF6B6B]"
-                  >
-                    {isSigningOut ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <LogOut className="w-4 h-4 mr-2" />
-                    )}
-                    {isSigningOut ? 'Signing out...' : 'Logout'}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                    Logout
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -255,30 +188,28 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        {/* Prompt to add li_at cookie when not set */}
-        {hasLiAtCookie === false && (
-          <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 p-4 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" aria-hidden />
-              <p className="text-sm">
-                Connect LinkedIn to get started: add your <code className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-xs">li_at</code> cookie in Settings so we can post, comment, and engage on your behalf.
+        {!isLinkedInConnected && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-amber-800">
+                Connect LinkedIn to get started: add your li_at cookie in Settings or use OAuth
               </p>
+              <Link
+                to="/dashboard/settings"
+                className="text-sm text-amber-800 font-medium hover:underline"
+              >
+                Connect in Settings →
+              </Link>
             </div>
-            <Link
-              to="/dashboard/settings"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/25 hover:bg-amber-500/35 text-amber-200 font-medium text-sm transition-colors shrink-0"
-            >
-              Connect in Settings
-              <ArrowRight className="w-4 h-4" />
-            </Link>
           </div>
         )}
 
-        {/* Page Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+        <main className="p-4 sm:p-6">
           <Outlet />
         </main>
       </div>
     </div>
   );
-}
+};
+
+export default DashboardLayout;

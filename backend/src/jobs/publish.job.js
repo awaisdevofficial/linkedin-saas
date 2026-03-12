@@ -1,42 +1,27 @@
 import * as supabase from '../services/supabase.service.js';
 import * as linkedin from '../services/linkedin.service.js';
+import { logger } from '../utils/logger.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function shouldPostNow(schedules) {
-  const now = new Date();
-  const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
-  const currentTime = now.toTimeString().slice(0, 5);
-  for (const s of schedules || []) {
-    if (!s.enabled || s.day !== dayName) continue;
-    const slots = s.time_slots || [];
-    for (const timeSlot of slots) {
-      const slot = String(timeSlot).slice(0, 5);
-      const [sh, sm] = slot.split(':').map(Number);
-      const [ch, cm] = currentTime.split(':').map(Number);
-      const diffMins = Math.abs((ch * 60 + cm) - (sh * 60 + sm));
-      if (diffMins <= 5) return true;
-    }
-  }
-  return false;
-}
 
 export async function runPublishJob() {
   let published = 0;
   const errors = [];
 
+  logger.automation('publish_job_start');
+
   try {
     const users = await supabase.getAllActiveUsers();
+    logger.automation('publish_job_users', { userCount: users.length });
 
     for (const user of users) {
       const userId = user.user_id;
       try {
-        const schedules = await supabase.getUserSchedule(userId);
-        if (!shouldPostNow(schedules)) continue;
-
         const posts = await supabase.getReadyToPublishPosts(userId);
         const post = posts?.[0];
         if (!post) continue;
+
+        logger.automation('publish_job_publishing', { userId, postId: post.id });
 
         const credentials = {
           accessToken: user.access_token,
@@ -58,6 +43,7 @@ export async function runPublishJob() {
           linkedin_post_id: postUrn,
         });
         published++;
+        logger.automation('publish_job_published', { userId, postId: post.id, postUrn });
 
         await sleep(120000);
 
@@ -69,13 +55,15 @@ export async function runPublishJob() {
           } catch (_) {}
         }
       } catch (e) {
+        logger.automation('publish_job_user_error', { userId, error: e.message });
         errors.push({ userId, action: 'publish', error: e.message });
       }
     }
 
+    logger.automation('publish_job_done', { published, errorCount: errors.length });
     return { published, errors };
   } catch (e) {
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), job: 'publish', error: e.message }));
+    logger.automation('publish_job_fatal', { error: e.message });
     return { published: 0, errors: [...errors, { error: e.message }] };
   }
 }

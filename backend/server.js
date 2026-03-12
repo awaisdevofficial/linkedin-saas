@@ -5,6 +5,8 @@ import cookieParser from 'cookie-parser';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
+import adminRoutes from './src/routes/admin.routes.js';
+import { logger } from './src/utils/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -31,6 +33,41 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 
+// ——— Log every HTTP request: method, path, status, duration, body (sanitized) ———
+app.use((req, res, next) => {
+  const start = Date.now();
+  const reqId = Math.random().toString(36).slice(2, 10);
+  const sanitize = (obj) => {
+    if (!obj || typeof obj !== 'object') return obj;
+    const copy = { ...obj };
+    const sensitive = ['password', 'password_hash', 'access_token', 'refresh_token', 'li_at_cookie', 'jsessionid', 'api_key', 'secret'];
+    for (const k of Object.keys(copy)) {
+      if (sensitive.some((s) => k.toLowerCase().includes(s))) copy[k] = '[REDACTED]';
+    }
+    return copy;
+  };
+  logger.http('request_in', {
+    reqId,
+    method: req.method,
+    path: req.path,
+    query: Object.keys(req.query || {}).length ? req.query : undefined,
+    body: req.body && Object.keys(req.body).length ? sanitize(req.body) : undefined,
+    ip: req.ip || req.socket?.remoteAddress,
+  });
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.http('request_out', {
+      reqId,
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      statusMessage: res.statusMessage,
+      durationMs: duration,
+    });
+  });
+  next();
+});
+
 const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID;
 const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET;
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -56,12 +93,41 @@ let supabaseAdmin;
 try {
   supabaseAdmin = createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'));
 } catch (e) {
-  console.warn('Supabase admin client not initialized:', e.message);
+  logger.warn('supabase_admin_not_initialized', { error: e.message });
+}
+
+/** Fetch LinkedIn profile picture, upload to Supabase Storage avatars bucket, return public URL. */
+async function uploadLinkedInAvatarToStorage(userId, linkedInPictureUrl) {
+  if (!linkedInPictureUrl || !supabaseAdmin) return null;
+  try {
+    const imgRes = await fetch(linkedInPictureUrl, { redirect: 'follow' });
+    if (!imgRes.ok) return null;
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+    const ext = contentType.includes('png') ? 'png' : 'jpg';
+    const path = `${userId}.${ext}`;
+
+    const { error } = await supabaseAdmin.storage.from('avatars').upload(path, buffer, {
+      contentType,
+      upsert: true,
+    });
+    if (error) {
+      logger.auth('avatar_upload_error', { userId, error: error.message });
+      return null;
+    }
+    const { data } = supabaseAdmin.storage.from('avatars').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (e) {
+    logger.auth('avatar_upload_error', { userId, error: e.message });
+    return null;
+  }
 }
 
 // ——— Step 1: Redirect user to LinkedIn ———
 app.get('/auth/linkedin', (req, res) => {
+  logger.auth('linkedin_redirect_start');
   if (!LINKEDIN_CLIENT_ID) {
+    logger.auth('linkedin_redirect_fail', { reason: 'LINKEDIN_CLIENT_ID not configured' });
     return res.status(500).send('LINKEDIN_CLIENT_ID not configured');
   }
   const state = uuidv4();
@@ -115,7 +181,7 @@ app.get('/auth/linkedin/callback', async (req, res) => {
 
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) {
-      console.error('LinkedIn token error:', tokenData);
+      logger.auth('linkedin_token_error', { status: tokenRes.status, error: tokenData.error });
       return res.redirect(`${FRONTEND_URL}${FRONTEND_PATHS.login}?error=token_exchange_failed`);
     }
 
@@ -154,16 +220,6 @@ app.get('/auth/linkedin/callback', async (req, res) => {
     if (byEmail) {
       userId = byEmail.id;
       userEmail = byEmail.email;
-      await supabaseAdmin.from('profiles').upsert(
-        {
-          id: userId,
-          full_name: fullName,
-          email: userEmail,
-          avatar_url: picture,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'id' }
-      );
     } else {
       userEmail = email || `${sub || uuidv4()}@linkedin.placeholder`;
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -172,18 +228,47 @@ app.get('/auth/linkedin/callback', async (req, res) => {
         user_metadata: { full_name: fullName, avatar_url: picture },
       });
       if (createError) {
-        console.error('Supabase createUser error:', createError);
+        logger.auth('supabase_create_user_error', { error: createError.message });
         return res.redirect(`${FRONTEND_URL}${FRONTEND_PATHS.login}?error=create_user_failed`);
       }
       userId = newUser.user.id;
       userEmail = newUser.user.email;
+    }
+
+    // Upload LinkedIn profile picture to our storage bucket (persistent URL, no LinkedIn dependency)
+    const avatarUrl = picture
+      ? (await uploadLinkedInAvatarToStorage(userId, picture)) || picture
+      : null;
+
+    if (byEmail) {
+      await Promise.all([
+        supabaseAdmin.from('profiles').upsert(
+          {
+            id: userId,
+            full_name: fullName,
+            email: userEmail,
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        ),
+        avatarUrl
+          ? supabaseAdmin.auth.admin.updateUserById(userId, {
+              user_metadata: { full_name: fullName, avatar_url: avatarUrl },
+            })
+          : Promise.resolve(),
+      ]);
+    } else {
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: { full_name: fullName, avatar_url: avatarUrl },
+      });
       await supabaseAdmin.from('profiles').insert({
         id: userId,
         full_name: fullName,
         email: userEmail,
-        avatar_url: picture,
+        avatar_url: avatarUrl,
       }).then((r) => {
-        if (r.error && r.error.code !== '23505') console.error('Profile insert error:', r.error);
+        if (r.error && r.error.code !== '23505') logger.auth('profile_insert_error', { error: r.error?.message });
       });
     }
 
@@ -216,21 +301,22 @@ app.get('/auth/linkedin/callback', async (req, res) => {
     });
 
     if (linkError || !linkData?.properties?.action_link) {
-      console.error('Magic link error:', linkError);
+      logger.auth('magic_link_error', { error: linkError?.message });
       return res.redirect(`${FRONTEND_URL}${FRONTEND_PATHS.callback}?fallback=1`);
     }
 
+    logger.auth('oauth_success', { userId, email: userEmail });
     res.redirect(linkData.properties.action_link);
   } catch (err) {
-    console.error('OAuth callback error:', err);
+    logger.auth('oauth_callback_error', { error: err.message });
     res.redirect(`${FRONTEND_URL}${FRONTEND_PATHS.login}?error=server_error`);
   }
 });
 
 // ——— Email/password login (custom table; no slow auth.updateUser)
-// Body: { email, password }. Returns { redirectUrl } magic link or 401.
+// Body: { email, password, redirect? }. Returns { redirectUrl } magic link or 401.
 app.post('/auth/login-email', async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, password, redirect } = req.body || {};
   if (!email || !password || !supabaseAdmin) {
     return res.status(400).json({ error: 'Missing email or password' });
   }
@@ -264,22 +350,26 @@ app.post('/auth/login-email', async (req, res) => {
   }
 
   const userEmail = profile.email || emailNorm;
+  const redirectPath = redirect && /^\/[a-zA-Z0-9/_-]*$/.test(String(redirect)) ? String(redirect) : '/dashboard';
+  const redirectTo = `${FRONTEND_URL}${redirectPath}`.replace(/\/$/, '') || `${FRONTEND_URL}/dashboard`;
   const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: 'magiclink',
     email: userEmail,
-    options: { redirectTo: `${FRONTEND_URL}/dashboard` },
+    options: { redirectTo },
   });
 
   if (linkError || !linkData?.properties?.action_link) {
-    console.error('Magic link error:', linkError);
+    logger.auth('email_login_magic_link_error', { error: linkError?.message });
     return res.status(500).json({ error: 'Login failed. Try again.' });
   }
 
+  logger.auth('email_login_success', { userId: profile.id });
   res.json({ redirectUrl: linkData.properties.action_link });
 });
 
 // Health check
 app.get('/health', (req, res) => {
+  logger.api('health_check', { linkedin: !!LINKEDIN_CLIENT_ID, supabase: !!supabaseAdmin });
   res.json({
     ok: true,
     linkedin: !!LINKEDIN_CLIENT_ID,
@@ -303,7 +393,8 @@ app.post('/api/generate', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const { runGenerateJob } = await import('./src/jobs/generate.job.js');
-    runGenerateJob(userId).catch((err) => console.error('[api/generate]', err.message));
+    logger.api('generate_triggered', { userId });
+    runGenerateJob(userId).catch((err) => logger.api('generate_job_error', { userId, error: err.message }));
     return res.status(200).json({ success: true, message: 'Generation started' });
   } catch (e) {
     return res.status(500).json({ error: 'Server error' });
@@ -376,7 +467,7 @@ app.post('/api/regenerate-image', async (req, res) => {
     });
     return res.status(200).json({ success: true, media_url: mediaUrl });
   } catch (e) {
-    console.error('[api/regenerate-image]', e.message);
+    logger.api('regenerate_image_error', { postId: req.body?.postId, error: e.message });
     return res.status(500).json({ error: e.message || 'Regenerate image failed' });
   }
 });
@@ -418,7 +509,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
     });
     return res.status(200).json({ success: true, media_url: mediaUrl });
   } catch (e) {
-    console.error('[api/generate-image-for-post]', e.message);
+    logger.api('generate_image_for_post_error', { postId: req.body?.postId, error: e.message });
     return res.status(500).json({ error: e.message || 'Generate image for post failed' });
   }
 });
@@ -468,7 +559,7 @@ app.post('/api/regenerate-post', async (req, res) => {
       hashtags: result.hashtags,
     });
   } catch (e) {
-    console.error('[api/regenerate-post]', e.message);
+    logger.api('regenerate_post_error', { postId: req.body?.postId, error: e.message });
     return res.status(500).json({ error: e.message || 'Regenerate post failed' });
   }
 });
@@ -522,7 +613,7 @@ app.post('/api/publish-now', async (req, res) => {
           }
         }
       } catch (imgErr) {
-        console.warn('[api/publish-now] image generation skipped:', imgErr.message);
+        logger.api('publish_now_image_skipped', { postId, error: imgErr.message });
         // Continue publishing without image
       }
     }
@@ -549,18 +640,21 @@ app.post('/api/publish-now', async (req, res) => {
             await sleep(60000);
           } catch (_) {}
         }
-      })().catch((err) => console.error('[api/publish-now] suggested comments', err.message));
+      })().catch((err) => logger.api('publish_now_suggested_comments_error', { error: err.message }));
     }
+    logger.api('publish_now_success', { postId, postUrn });
     return res.status(200).json({ success: true, postUrn });
   } catch (e) {
-    console.error('[api/publish-now]', e.message);
+    logger.api('publish_now_error', { postId: req.body?.postId, error: e.message });
     return res.status(500).json({ error: e.message || 'Publish failed' });
   }
 });
 
+app.use('/admin', adminRoutes);
+
 app.listen(PORT, () => {
-  console.log(`OAuth backend running at ${BACKEND_URL}`);
+  logger.info('server_started', { port: PORT, backendUrl: BACKEND_URL });
   if (!LINKEDIN_CLIENT_ID || !LINKEDIN_CLIENT_SECRET) {
-    console.warn('Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET for LinkedIn OAuth.');
+    logger.warn('linkedin_oauth_not_configured', { hint: 'Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET' });
   }
 });

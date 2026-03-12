@@ -1,121 +1,24 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import Navigation from '../components/Navigation';
-import HeroSection from '../sections/HeroSection';
-import FeatureSplit from '../sections/FeatureSplit';
-import FloatingCards from '../sections/FloatingCards';
-import Testimonials from '../sections/Testimonials';
-import Pricing from '../sections/Pricing';
-import FAQ from '../sections/FAQ';
-import Footer from '../sections/Footer';
+import Navigation from '@/components/landing/Navigation';
+import HeroSection from '@/components/landing/HeroSection';
+import { SchedulingFeature, AnalyticsFeature, EngagementFeature } from '@/components/landing/FeatureSplit';
+import FloatingCards from '@/components/landing/FloatingCards';
+import SecurityFeature from '@/components/landing/SecurityFeature';
+import Testimonials from '@/components/landing/Testimonials';
+import Pricing from '@/components/landing/Pricing';
+import FAQ from '@/components/landing/FAQ';
+import FinalCTA from '@/components/landing/FinalCTA';
+import Footer from '@/components/landing/Footer';
+import DashboardPreview from '@/components/landing/DashboardPreview';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const features = [
-  {
-    id: 'scheduling',
-    label: 'SCHEDULING',
-    headline: 'Plan your week in minutes.',
-    body: 'Drag, drop, and schedule posts across profiles. PostPilot publishes at the best times—automatically.',
-    cta: 'See how scheduling works',
-    image: '/images/scheduling-workspace.jpg',
-    reverse: false,
-  },
-  {
-    id: 'analytics',
-    label: 'ANALYTICS',
-    headline: 'Know what\'s working.',
-    body: 'Track reach, engagement, and follower growth—then double down on the content that converts.',
-    cta: 'Explore analytics',
-    image: '/images/analytics-desk.jpg',
-    reverse: true,
-  },
-  {
-    id: 'engagement',
-    label: 'ENGAGEMENT',
-    headline: 'Stay responsive at scale.',
-    body: 'Auto-reply to comments, manage DMs, and nurture leads—without losing the human touch.',
-    cta: 'Learn about engagement',
-    image: '/images/team-meeting.jpg',
-    reverse: false,
-  },
-];
-
-const floatingContent = {
-  headline: 'Create content that lands.',
-  body: 'From hooks to carousels, PostPilot helps you build posts that feel personal—at scale.',
-  background: '/images/creative-desk.jpg',
-  cards: [
-    {
-      title: 'AI-assisted drafts',
-      body: 'Generate captions and variants in your tone.',
-      position: 'top-left' as const,
-    },
-    {
-      title: 'Carousel builder',
-      body: 'Turn a brief into a swipeable PDF deck.',
-      position: 'top-right' as const,
-    },
-    {
-      title: 'Hashtag + mention suggestions',
-      body: 'Reach the right people without the guesswork.',
-      position: 'bottom-center' as const,
-    },
-  ],
-};
-
-const floatingCollaboration = {
-  headline: 'Built for teams.',
-  body: 'Draft, review, and approve posts together—without endless threads.',
-  background: '/images/office-lounge.jpg',
-  cards: [
-    {
-      title: 'Comments & mentions',
-      body: 'Tag teammates for fast feedback.',
-      position: 'top-left' as const,
-    },
-    {
-      title: 'Approval workflows',
-      body: 'Require sign-off before anything goes live.',
-      position: 'top-right' as const,
-    },
-    {
-      title: 'Shared content library',
-      body: 'Save snippets, images, and templates for reuse.',
-      position: 'bottom-center' as const,
-    },
-  ],
-};
-
-const securityFeature = {
-  id: 'security',
-  label: 'SECURITY',
-  headline: 'Your data stays yours.',
-  body: 'Encrypted at rest, minimal permissions, and full control over what PostPilot can access.',
-  cta: 'Read our security overview',
-  image: '/images/security-server.jpg',
-  reverse: true,
-  glow: true,
-};
-
-const integrationsFeature = {
-  id: 'integrations',
-  label: 'INTEGRATIONS',
-  headline: 'Plays well with your stack.',
-  body: 'Connect your favorite tools—CRM, docs, storage, and more—so your workflow stays seamless.',
-  cta: 'Browse integrations',
-  image: '/images/tech-office.jpg',
-  reverse: false,
-  icons: true,
-};
-
-export default function LandingPage() {
-  const mainRef = useRef<HTMLDivElement>(null);
-
+const LandingPage = () => {
   useEffect(() => {
-    // Global snap for pinned sections
-    const setupGlobalSnap = () => {
+    // Global snap configuration for pinned sections
+    const setupSnap = () => {
       const pinned = ScrollTrigger.getAll()
         .filter(st => st.vars.pin)
         .sort((a, b) => a.start - b.start);
@@ -133,7 +36,7 @@ export default function LandingPage() {
         snap: {
           snapTo: (value: number) => {
             const inPinned = pinnedRanges.some(
-              r => value >= r.start - 0.08 && value <= r.end + 0.08
+              r => value >= r.start - 0.02 && value <= r.end + 0.02
             );
             if (!inPinned) return value;
 
@@ -153,8 +56,8 @@ export default function LandingPage() {
       });
     };
 
-    // Delay to allow all ScrollTriggers to initialize
-    const timer = setTimeout(setupGlobalSnap, 500);
+    // Delay to ensure all ScrollTriggers are created
+    const timer = setTimeout(setupSnap, 100);
 
     return () => {
       clearTimeout(timer);
@@ -163,40 +66,44 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div ref={mainRef} className="landing-root relative bg-[#070A12]">
+    <main className="relative">
       <Navigation />
       
-      {/* Section 1: Hero */}
-      <HeroSection />
+      {/* Pinned Sections with z-index stacking */}
+      <div className="relative z-10">
+        <HeroSection />
+      </div>
+      <div className="relative z-20">
+        <SchedulingFeature />
+      </div>
+      <div className="relative z-30">
+        <AnalyticsFeature />
+      </div>
+      <div className="relative z-40">
+        <EngagementFeature />
+      </div>
+      <div className="relative z-50">
+        <FloatingCards />
+      </div>
+      <div className="relative z-[55]">
+        <SecurityFeature />
+      </div>
       
-      {/* Sections 2-4: Feature Splits */}
-      {features.map((feature, index) => (
-        <FeatureSplit key={feature.id} {...feature} index={index + 1} />
-      ))}
-      
-      {/* Section 5: Floating Cards - Content */}
-      <FloatingCards {...floatingContent} index={4} />
-      
-      {/* Section 6: Floating Cards - Collaboration */}
-      <FloatingCards {...floatingCollaboration} index={5} />
-      
-      {/* Section 7: Security */}
-      <FeatureSplit {...securityFeature} index={6} />
-      
-      {/* Section 8: Integrations */}
-      <FeatureSplit {...integrationsFeature} index={7} />
-      
-      {/* Section 9: Testimonials */}
+      {/* Flowing Sections */}
       <Testimonials />
-      
-      {/* Section 10: Pricing */}
       <Pricing />
-      
-      {/* Section 11: FAQ */}
       <FAQ />
       
-      {/* Section 12: Footer */}
+      {/* Final Pinned CTA */}
+      <div className="relative z-[60]">
+        <FinalCTA />
+      </div>
+      
+      {/* Footer and Dashboard Preview */}
       <Footer />
-    </div>
+      <DashboardPreview />
+    </main>
   );
-}
+};
+
+export default LandingPage;

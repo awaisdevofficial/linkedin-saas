@@ -4,65 +4,96 @@ import { runMediaJob } from '../jobs/media.job.js';
 import { runPublishJob } from '../jobs/publish.job.js';
 import { runEngageJob } from '../jobs/engage.job.js';
 import { runReplyJob } from '../jobs/reply.job.js';
+import { runHealthJob } from '../jobs/health.job.js';
+import { runResetJob } from '../jobs/reset.job.js';
+import { logger } from '../utils/logger.js';
 
 export function startScheduler() {
-  cron.schedule('0 9 * * *', async () => {
+  logger.automation('scheduler_registering', { jobs: ['generate', 'media', 'publish', 'engage', 'reply', 'health', 'reset'] });
+
+  // Generate: every 12 hours
+  cron.schedule('0 */12 * * *', async () => {
     const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'generate', schedule: '0 */12 * * *', timestamp });
     try {
       const result = await runGenerateJob();
-      console.log(JSON.stringify({ timestamp, job: 'generate', result }));
+      logger.automation('cron_completed', { job: 'generate', result, timestamp });
     } catch (e) {
-      console.error(JSON.stringify({ timestamp, job: 'generate', error: e.message }));
+      logger.automation('cron_failed', { job: 'generate', error: e.message, timestamp });
     }
   });
 
-  cron.schedule('0 * * * *', async () => {
-    const timestamp = new Date().toISOString();
-    try {
-      const result = await runGenerateJob();
-      console.log(JSON.stringify({ timestamp, job: 'generate_hourly', result }));
-    } catch (e) {
-      console.error(JSON.stringify({ timestamp, job: 'generate_hourly', error: e.message }));
-    }
-  });
-
+  // Media: every 30 minutes
   cron.schedule('*/30 * * * *', async () => {
     const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'media', schedule: '*/30 * * * *', timestamp });
     try {
       const result = await runMediaJob();
-      console.log(JSON.stringify({ timestamp, job: 'media', result }));
+      logger.automation('cron_completed', { job: 'media', result, timestamp });
     } catch (e) {
-      console.error(JSON.stringify({ timestamp, job: 'media', error: e.message }));
+      logger.automation('cron_failed', { job: 'media', error: e.message, timestamp });
     }
   });
 
+  // Publish: every 5 minutes
   cron.schedule('*/5 * * * *', async () => {
     const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'publish', schedule: '*/5 * * * *', timestamp });
     try {
       const result = await runPublishJob();
-      console.log(JSON.stringify({ timestamp, job: 'publish', result }));
+      logger.automation('cron_completed', { job: 'publish', result, timestamp });
     } catch (e) {
-      console.error(JSON.stringify({ timestamp, job: 'publish', error: e.message }));
+      logger.automation('cron_failed', { job: 'publish', error: e.message, timestamp });
     }
   });
 
+  // Engage: every 2 hours
   cron.schedule('0 */2 * * *', async () => {
     const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'engage', schedule: '0 */2 * * *', timestamp });
     try {
       const result = await runEngageJob();
-      console.log(JSON.stringify({ timestamp, job: 'engage', result }));
+      logger.automation('cron_completed', { job: 'engage', result, timestamp });
     } catch (e) {
-      console.error(JSON.stringify({ timestamp, job: 'engage', error: e.message }));
+      logger.automation('cron_failed', { job: 'engage', error: e.message, timestamp });
     }
   });
 
+  // Reply: every 15 minutes
   cron.schedule('*/15 * * * *', async () => {
     const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'reply', schedule: '*/15 * * * *', timestamp });
     try {
       const result = await runReplyJob();
-      console.log(JSON.stringify({ timestamp, job: 'reply', result }));
+      logger.automation('cron_completed', { job: 'reply', result, timestamp });
     } catch (e) {
-      console.error(JSON.stringify({ timestamp, job: 'reply', error: e.message }));
+      logger.automation('cron_failed', { job: 'reply', error: e.message, timestamp });
     }
   });
+
+  // Health: daily at 8am
+  cron.schedule('0 8 * * *', async () => {
+    const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'health', schedule: '0 8 * * *', timestamp });
+    try {
+      const result = await runHealthJob();
+      logger.automation('cron_completed', { job: 'health', result, timestamp });
+    } catch (e) {
+      logger.automation('cron_failed', { job: 'health', error: e.message, timestamp });
+    }
+  });
+
+  // Reset: weekly Sunday midnight
+  cron.schedule('0 0 * * 0', async () => {
+    const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'reset', schedule: '0 0 * * 0', timestamp });
+    try {
+      const result = await runResetJob();
+      logger.automation('cron_completed', { job: 'reset', result, timestamp });
+    } catch (e) {
+      logger.automation('cron_failed', { job: 'reset', error: e.message, timestamp });
+    }
+  });
+
+  logger.automation('scheduler_registered', { message: 'All cron jobs active' });
 }

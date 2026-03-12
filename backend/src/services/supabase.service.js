@@ -242,13 +242,15 @@ export async function getPendingMediaPosts(userId) {
 export async function getReadyToPublishPosts(userId) {
   try {
     const supabase = getClient();
+    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('posts')
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'ready_to_post')
       .eq('posted', false)
-      .lte('scheduled_at', new Date().toISOString())
+      .not('scheduled_at', 'is', null)
+      .lte('scheduled_at', now)
       .order('scheduled_at', { ascending: true })
       .limit(1);
     if (error) return [];
@@ -362,6 +364,7 @@ export async function logEngagement(userId, data) {
       activity_id: data.activity_id ?? null,
       action: data.action,
       comment_text: data.comment_text ?? null,
+      post_content: data.post_content ?? null,
       status: data.status ?? 'completed',
       executed_at: new Date().toISOString(),
     });

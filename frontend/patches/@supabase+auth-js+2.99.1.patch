@@ -1,0 +1,160 @@
+diff --git a/node_modules/@supabase/auth-js/dist/module/AuthAdminApi.d.ts b/node_modules/@supabase/auth-js/dist/module/AuthAdminApi.d.ts
+index aacb97d..b5fc9c4 100644
+--- a/node_modules/@supabase/auth-js/dist/module/AuthAdminApi.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/AuthAdminApi.d.ts
+@@ -1,4 +1,4 @@
+-import GoTrueAdminApi from './GoTrueAdminApi';
++import GoTrueAdminApi from '@supabase/auth-js/src/GoTrueAdminApi';
+ declare const AuthAdminApi: typeof GoTrueAdminApi;
+ export default AuthAdminApi;
+ //# sourceMappingURL=AuthAdminApi.d.ts.map
+\ No newline at end of file
+diff --git a/node_modules/@supabase/auth-js/dist/module/AuthClient.d.ts b/node_modules/@supabase/auth-js/dist/module/AuthClient.d.ts
+index 596eec9..7d16417 100644
+--- a/node_modules/@supabase/auth-js/dist/module/AuthClient.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/AuthClient.d.ts
+@@ -1,4 +1,4 @@
+-import GoTrueClient from './GoTrueClient';
++import GoTrueClient from '@supabase/auth-js/src/GoTrueClient';
+ declare const AuthClient: typeof GoTrueClient;
+ export default AuthClient;
+ //# sourceMappingURL=AuthClient.d.ts.map
+\ No newline at end of file
+diff --git a/node_modules/@supabase/auth-js/dist/module/GoTrueAdminApi.d.ts b/node_modules/@supabase/auth-js/dist/module/GoTrueAdminApi.d.ts
+index 24e1d3d..df7d8e7 100644
+--- a/node_modules/@supabase/auth-js/dist/module/GoTrueAdminApi.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/GoTrueAdminApi.d.ts
+@@ -1,6 +1,6 @@
+-import { Fetch } from './lib/fetch';
+-import { AdminUserAttributes, GenerateLinkParams, GenerateLinkResponse, Pagination, User, UserResponse, GoTrueAdminMFAApi, PageParams, SignOutScope, GoTrueAdminOAuthApi, GoTrueAdminCustomProvidersApi } from './lib/types';
+-import { AuthError } from './lib/errors';
++import { Fetch } from '@supabase/auth-js/src/lib/fetch';
++import { AdminUserAttributes, GenerateLinkParams, GenerateLinkResponse, Pagination, User, UserResponse, GoTrueAdminMFAApi, PageParams, SignOutScope, GoTrueAdminOAuthApi, GoTrueAdminCustomProvidersApi } from '@supabase/auth-js/src/lib/types';
++import { AuthError } from '@supabase/auth-js/src/lib/errors';
+ export default class GoTrueAdminApi {
+     /** Contains all MFA administration methods. */
+     mfa: GoTrueAdminMFAApi;
+diff --git a/node_modules/@supabase/auth-js/dist/module/GoTrueClient.d.ts b/node_modules/@supabase/auth-js/dist/module/GoTrueClient.d.ts
+index 48072ef..1b8382d 100644
+--- a/node_modules/@supabase/auth-js/dist/module/GoTrueClient.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/GoTrueClient.d.ts
+@@ -1,8 +1,8 @@
+-import GoTrueAdminApi from './GoTrueAdminApi';
+-import { AuthError } from './lib/errors';
+-import { Fetch } from './lib/fetch';
+-import { Deferred } from './lib/helpers';
+-import type { AuthChangeEvent, AuthFlowType, AuthOtpResponse, AuthResponse, AuthTokenResponse, AuthTokenResponsePassword, CallRefreshTokenResult, GoTrueClientOptions, GoTrueMFAApi, InitializeResult, JWK, JwtHeader, JwtPayload, LockFunc, OAuthResponse, AuthOAuthServerApi, ResendParams, Session, SignInAnonymouslyCredentials, SignInWithIdTokenCredentials, SignInWithOAuthCredentials, SignInWithPasswordCredentials, SignInWithPasswordlessCredentials, SignInWithSSO, SignOut, SignUpWithPasswordCredentials, SSOResponse, Subscription, SupportedStorage, User, UserAttributes, UserIdentity, UserResponse, VerifyOtpParams, Web3Credentials } from './lib/types';
++import GoTrueAdminApi from '@supabase/auth-js/src/GoTrueAdminApi';
++import { AuthError } from '@supabase/auth-js/src/lib/errors';
++import { Fetch } from '@supabase/auth-js/src/lib/fetch';
++import { Deferred } from '@supabase/auth-js/src/lib/helpers';
++import type { AuthChangeEvent, AuthFlowType, AuthOtpResponse, AuthResponse, AuthTokenResponse, AuthTokenResponsePassword, CallRefreshTokenResult, GoTrueClientOptions, GoTrueMFAApi, InitializeResult, JWK, JwtHeader, JwtPayload, LockFunc, OAuthResponse, AuthOAuthServerApi, ResendParams, Session, SignInAnonymouslyCredentials, SignInWithIdTokenCredentials, SignInWithOAuthCredentials, SignInWithPasswordCredentials, SignInWithPasswordlessCredentials, SignInWithSSO, SignOut, SignUpWithPasswordCredentials, SSOResponse, Subscription, SupportedStorage, User, UserAttributes, UserIdentity, UserResponse, VerifyOtpParams, Web3Credentials } from '@supabase/auth-js/src/lib/types';
+ export default class GoTrueClient {
+     private static nextInstanceID;
+     private instanceID;
+diff --git a/node_modules/@supabase/auth-js/dist/module/index.d.ts b/node_modules/@supabase/auth-js/dist/module/index.d.ts
+index 62b23d0..71b4319 100644
+--- a/node_modules/@supabase/auth-js/dist/module/index.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/index.d.ts
+@@ -5,5 +5,5 @@ import AuthClient from './AuthClient';
+ export { GoTrueAdminApi, GoTrueClient, AuthAdminApi, AuthClient };
+ export * from './lib/types';
+ export * from './lib/errors';
+-export { navigatorLock, NavigatorLockAcquireTimeoutError, internals as lockInternals, processLock, } from './lib/locks';
++export { navigatorLock, NavigatorLockAcquireTimeoutError, internals as lockInternals, processLock } from './lib/locks';
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/errors.d.ts b/node_modules/@supabase/auth-js/dist/module/lib/errors.d.ts
+index 61a92ec..64f6f2e 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/errors.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/lib/errors.d.ts
+@@ -1,5 +1,5 @@
+-import { WeakPasswordReasons } from './types';
+-import { ErrorCode } from './error-codes';
++import { WeakPasswordReasons } from '@supabase/auth-js/src/lib/types';
++import { ErrorCode } from '@supabase/auth-js/src/lib/error-codes';
+ /**
+  * Base error thrown by Supabase Auth helpers.
+  *
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/fetch.d.ts b/node_modules/@supabase/auth-js/dist/module/lib/fetch.d.ts
+index 4649c74..a1dbf5d 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/fetch.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/lib/fetch.d.ts
+@@ -1,4 +1,4 @@
+-import { AuthResponse, AuthResponsePassword, SSOResponse, GenerateLinkResponse, UserResponse } from './types';
++import { AuthResponse, AuthResponsePassword, SSOResponse, GenerateLinkResponse, UserResponse } from '@supabase/auth-js/src/lib/types';
+ export type Fetch = typeof fetch;
+ export interface FetchOptions {
+     headers?: {
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/helpers.d.ts b/node_modules/@supabase/auth-js/dist/module/lib/helpers.d.ts
+index 43fdc86..5f45605 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/helpers.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/lib/helpers.d.ts
+@@ -1,5 +1,5 @@
+-import { JwtHeader, JwtPayload, SupportedStorage, User } from './types';
+-import { Uint8Array_ } from './webauthn.dom';
++import { JwtHeader, JwtPayload, SupportedStorage, User } from '@supabase/auth-js/src/lib/types';
++import { Uint8Array_ } from '@supabase/auth-js/src/lib/webauthn.dom';
+ export declare function expiresAt(expiresIn: number): number;
+ /**
+  * Generates a unique identifier for internal callback subscriptions.
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/types.d.ts b/node_modules/@supabase/auth-js/dist/module/lib/types.d.ts
+index b2360b5..1fdcf1c 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/types.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/lib/types.d.ts
+@@ -1,9 +1,9 @@
+-import { AuthError } from './errors';
+-import { Fetch } from './fetch';
+-import { EIP1193Provider, EthereumSignInInput, Hex } from './web3/ethereum';
+-import type { SolanaSignInInput, SolanaSignInOutput } from './web3/solana';
+-import { ServerCredentialCreationOptions, ServerCredentialRequestOptions, WebAuthnApi } from './webauthn';
+-import { AuthenticationCredential, PublicKeyCredentialCreationOptionsFuture, PublicKeyCredentialRequestOptionsFuture, RegistrationCredential } from './webauthn.dom';
++import { AuthError } from '@supabase/auth-js/src/lib/errors';
++import { Fetch } from '@supabase/auth-js/src/lib/fetch';
++import { EIP1193Provider, EthereumSignInInput, Hex } from '@supabase/auth-js/src/lib/web3/ethereum';
++import type { SolanaSignInInput, SolanaSignInOutput } from '@supabase/auth-js/src/lib/web3/solana';
++import { ServerCredentialCreationOptions, ServerCredentialRequestOptions, WebAuthnApi } from '@supabase/auth-js/src/lib/webauthn';
++import { AuthenticationCredential, PublicKeyCredentialCreationOptionsFuture, PublicKeyCredentialRequestOptionsFuture, RegistrationCredential } from '@supabase/auth-js/src/lib/webauthn.dom';
+ /** One of the providers supported by GoTrue. Use the `custom:` prefix for custom OIDC providers (e.g. `custom:my-oidc-provider`). */
+ export type Provider = 'apple' | 'azure' | 'bitbucket' | 'discord' | 'facebook' | 'figma' | 'github' | 'gitlab' | 'google' | 'kakao' | 'keycloak' | 'linkedin' | 'linkedin_oidc' | 'notion' | 'slack' | 'slack_oidc' | 'spotify' | 'twitch'
+ /** Uses OAuth 1.0a */
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/webauthn.d.ts b/node_modules/@supabase/auth-js/dist/module/lib/webauthn.d.ts
+index a0fd0d8..20d31b4 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/webauthn.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/lib/webauthn.d.ts
+@@ -1,8 +1,8 @@
+-import GoTrueClient from '../GoTrueClient';
+-import { AuthError } from './errors';
+-import { AuthMFAEnrollWebauthnResponse, AuthMFAVerifyResponse, AuthMFAVerifyResponseData, MFAChallengeWebauthnParams, MFAEnrollWebauthnParams, MFAVerifyWebauthnParamFields, MFAVerifyWebauthnParams, RequestResult, StrictOmit } from './types';
+-import type { AuthenticationCredential, AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsFuture, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsFuture, PublicKeyCredentialRequestOptionsJSON, RegistrationCredential, RegistrationResponseJSON } from './webauthn.dom';
+-import { identifyAuthenticationError, identifyRegistrationError, isWebAuthnError, WebAuthnError } from './webauthn.errors';
++import GoTrueClient from '@supabase/auth-js/src/GoTrueClient';
++import { AuthError } from '@supabase/auth-js/src/lib/errors';
++import { AuthMFAEnrollWebauthnResponse, AuthMFAVerifyResponse, AuthMFAVerifyResponseData, MFAChallengeWebauthnParams, MFAEnrollWebauthnParams, MFAVerifyWebauthnParamFields, MFAVerifyWebauthnParams, RequestResult, StrictOmit } from '@supabase/auth-js/src/lib/types';
++import type { AuthenticationCredential, AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsFuture, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsFuture, PublicKeyCredentialRequestOptionsJSON, RegistrationCredential, RegistrationResponseJSON } from '@supabase/auth-js/src/lib/webauthn.dom';
++import { identifyAuthenticationError, identifyRegistrationError, isWebAuthnError, WebAuthnError } from '@supabase/auth-js/src/lib/webauthn.errors';
+ export { WebAuthnError, isWebAuthnError, identifyRegistrationError, identifyAuthenticationError };
+ export type { RegistrationResponseJSON, AuthenticationResponseJSON };
+ /**
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/webauthn.dom.d.ts b/node_modules/@supabase/auth-js/dist/module/lib/webauthn.dom.d.ts
+index ff0410f..6122679 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/webauthn.dom.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/lib/webauthn.dom.d.ts
+@@ -1,4 +1,4 @@
+-import { StrictOmit } from './types';
++import { StrictOmit } from '@supabase/auth-js/src/lib/types';
+ /**
+  * A variant of PublicKeyCredentialCreationOptions suitable for JSON transmission to the browser to
+  * (eventually) get passed into navigator.credentials.create(...) in the browser.
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/webauthn.errors.d.ts b/node_modules/@supabase/auth-js/dist/module/lib/webauthn.errors.d.ts
+index 5fe8218..16a655b 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/webauthn.errors.d.ts
++++ b/node_modules/@supabase/auth-js/dist/module/lib/webauthn.errors.d.ts
+@@ -1,5 +1,5 @@
+-import { StrictOmit } from './types';
+-import { PublicKeyCredentialCreationOptionsFuture, PublicKeyCredentialRequestOptionsFuture } from './webauthn.dom';
++import { StrictOmit } from '@supabase/auth-js/src/lib/types';
++import { PublicKeyCredentialCreationOptionsFuture, PublicKeyCredentialRequestOptionsFuture } from '@supabase/auth-js/src/lib/webauthn.dom';
+ /**
+  * A custom Error used to return a more nuanced error detailing _why_ one of the eight documented
+  * errors in the spec was raised after calling `navigator.credentials.create()` or

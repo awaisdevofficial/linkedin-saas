@@ -3,6 +3,7 @@ import * as promptService from '../services/prompt.service.js';
 import * as openai from '../services/openai.service.js';
 import * as linkedin from '../services/linkedin.service.js';
 import * as feed from '../services/feed.service.js';
+import { logger } from '../utils/logger.js';
 
 function shuffle(arr) {
   const a = [...arr];
@@ -29,8 +30,11 @@ export async function runEngageJob() {
   let engaged = 0;
   const errors = [];
 
+  logger.automation('engage_job_start', { timestamp: ts });
+
   try {
     const users = await supabase.getAllActiveUsers();
+    logger.automation('engage_job_users', { userCount: users.length });
 
     for (const user of users) {
       const userId = user.user_id;
@@ -43,6 +47,8 @@ export async function runEngageJob() {
 
         const count = await supabase.getDailyEngagementCount(userId);
         if (count >= (settings.max_engagements_per_day || 50)) continue;
+
+        logger.automation('engage_job_user_active', { userId, count, max: settings.max_engagements_per_day || 50 });
 
         const feedItems = await feed.fetchLinkedInFeed(user.li_at_cookie, user.csrfToken);
         const shuffled = shuffle(feedItems).slice(0, 5);
@@ -67,6 +73,7 @@ export async function runEngageJob() {
                 action: 'like',
                 post_uri: item.uri,
                 activity_id: item.activity_id,
+                post_content: item.description ?? null,
                 status: likeResult?.skipped ? 'skipped' : 'completed',
               });
               if (!likeResult?.error) engaged++;
@@ -84,23 +91,27 @@ export async function runEngageJob() {
                 post_uri: item.uri,
                 activity_id: item.activity_id,
                 comment_text: commentText,
+                post_content: item.description ?? null,
                 status: 'completed',
               });
               engaged++;
               await new Promise((r) => setTimeout(r, intervalMs));
             }
           } catch (e) {
+            logger.automation('engage_job_item_error', { userId, postUri: item.uri, error: e.message });
             errors.push({ userId, action: 'engage', postUri: item.uri, error: e.message });
           }
         }
       } catch (e) {
+        logger.automation('engage_job_user_error', { userId, error: e.message });
         errors.push({ userId, action: 'engage', error: e.message });
       }
     }
 
+    logger.automation('engage_job_done', { usersProcessed: users.length, totalEngagements: engaged, errorCount: errors.length });
     return { usersProcessed: users.length, totalEngagements: engaged, errors };
   } catch (e) {
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), job: 'engage', error: e.message }));
+    logger.automation('engage_job_fatal', { error: e.message });
     return { usersProcessed: 0, totalEngagements: 0, errors: [...errors, { error: e.message }] };
   }
 }

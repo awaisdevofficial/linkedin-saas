@@ -2,6 +2,7 @@ import * as supabase from '../services/supabase.service.js';
 import * as openai from '../services/openai.service.js';
 import * as rss from '../services/rss.service.js';
 import * as imageService from '../services/image.service.js';
+import { logger } from '../utils/logger.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -11,10 +12,14 @@ export async function runGenerateJob(optionUserId = null) {
   let postsCreated = 0;
   const errors = [];
 
+  logger.automation('generate_job_start', { optionUserId, timestamp: ts });
+
   try {
     let users = await supabase.getAllActiveUsers();
     if (optionUserId) users = users.filter((u) => u.user_id === optionUserId);
+    logger.automation('generate_job_users', { userCount: users.length, userIds: users.map((u) => u.user_id) });
     if (!users.length) {
+      logger.automation('generate_job_skip', { reason: 'no_users' });
       return { usersProcessed: 0, postsCreated: 0, errors: [] };
     }
 
@@ -22,11 +27,15 @@ export async function runGenerateJob(optionUserId = null) {
     for (const user of users) {
       try {
         const settings = await supabase.getUserContentSettings(user.user_id);
-        if (settings.generation_paused) continue;
+        if (settings.generation_paused) {
+          logger.automation('generate_job_user_skipped', { userId: user.user_id, reason: 'generation_paused' });
+          continue;
+        }
         const niche = settings.niche || 'tech';
         if (!nicheGroups.has(niche)) nicheGroups.set(niche, []);
         nicheGroups.get(niche).push({ user, settings });
       } catch (e) {
+        logger.automation('generate_job_user_error', { userId: user.user_id, error: e.message });
         errors.push({ userId: user.user_id, error: e.message });
       }
     }
@@ -43,10 +52,12 @@ export async function runGenerateJob(optionUserId = null) {
           supabase.getUserContentSettings
         );
       } catch (e) {
+        logger.automation('generate_job_rss_error', { niche, error: e.message });
         errors.push({ niche, error: e.message });
         continue;
       }
       const topArticles = (articles || []).slice(0, 1);
+      logger.automation('generate_job_articles', { niche, articleCount: topArticles.length });
       if (!topArticles.length) continue;
 
       for (const article of topArticles) {
@@ -65,7 +76,10 @@ export async function runGenerateJob(optionUserId = null) {
               status: 'pending',
               posted: false,
             });
-            if (postId) postsCreated++;
+            if (postId) {
+              postsCreated++;
+              logger.automation('generate_job_post_created', { userId, postId });
+            }
 
             // Generate and attach image so user sees post + picture together
             if (postId && result.visual_prompt) {
@@ -83,6 +97,7 @@ export async function runGenerateJob(optionUserId = null) {
                   }
                 }
               } catch (imgErr) {
+                logger.automation('generate_job_image_error', { userId, postId, error: imgErr.message });
                 errors.push({ userId, postId, action: 'generateImage', error: imgErr.message });
               }
               await sleep(3000);
@@ -91,15 +106,17 @@ export async function runGenerateJob(optionUserId = null) {
             usersProcessed++;
             await sleep(2000);
           } catch (e) {
+            logger.automation('generate_job_post_error', { userId, action: 'generatePost', error: e.message });
             errors.push({ userId, action: 'generatePost', error: e.message });
           }
         }
       }
     }
 
+    logger.automation('generate_job_done', { usersProcessed, postsCreated, errorCount: errors.length });
     return { usersProcessed, postsCreated, errors };
   } catch (e) {
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), job: 'generate', error: e.message }));
+    logger.automation('generate_job_fatal', { error: e.message });
     return { usersProcessed, postsCreated, errors: [...errors, { error: e.message }] };
   }
 }

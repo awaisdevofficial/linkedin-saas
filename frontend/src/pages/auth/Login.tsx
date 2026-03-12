@@ -1,135 +1,121 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { useAuth } from '../../lib/auth-context';
-import { OAUTH_BACKEND_URL } from '../../lib/config';
+import { Eye, EyeOff, ArrowLeft, Linkedin } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/lib/auth-context';
+import { apiCalls } from '@/lib/api';
+import { OAUTH_BACKEND_URL } from '@/lib/config';
 
-const OAUTH_ERROR_MESSAGES: Record<string, string> = {
-  user_cancelled_authorize: 'You cancelled sign in.',
-  missing_code_or_state: 'Invalid sign-in response. Please try again.',
-  invalid_state: 'Session expired. Please try again.',
-  server_config: 'OAuth is not configured. Contact support.',
-  token_exchange_failed: 'Could not complete sign in. Please try again.',
-  create_user_failed: 'Could not create account. Try again or sign up with email.',
-  server_error: 'Something went wrong. Please try again.',
-};
-
-export default function Login() {
+const Login = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { signIn } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { user, isLoading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    rememberMe: false,
   });
 
+  const urlError = searchParams.get('error');
   useEffect(() => {
-    const err = searchParams.get('error');
-    if (err) {
-      setError(OAUTH_ERROR_MESSAGES[err] || err);
-      setSearchParams({}, { replace: true });
+    if (urlError) {
+      setError(decodeURIComponent(urlError));
     }
-  }, [searchParams, setSearchParams]);
+  }, [urlError]);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
+  const handleLinkedIn = () => {
+    window.location.href = `${OAUTH_BACKEND_URL}/auth/linkedin`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
-
-    if (OAUTH_BACKEND_URL) {
-      try {
-        const res = await fetch(`${OAUTH_BACKEND_URL}/auth/login-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email.trim(), password: formData.password }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.redirectUrl) {
-          window.location.href = data.redirectUrl;
-          return;
-        }
-        setError(data.error || 'Invalid email or password');
-      } catch {
-        setError('Could not reach server. Try again.');
+    setIsLoading(true);
+    try {
+      const redirect = '/dashboard';
+      const { redirectUrl } = await apiCalls.loginEmail(
+        formData.email.trim(),
+        formData.password,
+        redirect
+      );
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+        return;
       }
+      setError('Login failed. Try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed.');
+    } finally {
       setIsLoading(false);
-      return;
-    }
-
-    const { error } = await signIn(formData.email, formData.password);
-    setIsLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
-      navigate('/dashboard');
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#070A12] flex items-center justify-center p-4">
-      {/* Background gradient */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(79,109,255,0.15)_0%,_transparent_50%)]" />
-      
-      <div className="relative z-10 w-full max-w-md">
-        {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4F6DFF] to-[#27C696] flex items-center justify-center">
-              <span className="text-white font-bold text-lg">LF</span>
-            </div>
-            <span className="text-2xl font-semibold text-[#F2F5FF]">PostPilot</span>
-          </Link>
-        </div>
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] animate-pulse" />
+      </div>
+    );
+  }
 
-        {/* Card */}
-        <div className="glass-card p-8">
-          <h1 className="text-2xl font-semibold text-[#F2F5FF] mb-2 text-center">
-            Welcome back
-          </h1>
-          <p className="text-[#A7B1D8] text-center mb-8 text-sm">
-            Sign in to your account to manage posts and engagement.
-          </p>
+  return (
+    <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-[#6B7098] hover:text-[#10153E] transition-colors mb-8"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm">Back to home</span>
+        </Link>
+
+        <div className="bg-white rounded-[28px] p-8 card-shadow">
+          <div className="flex justify-center mb-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] flex items-center justify-center">
+              <span className="text-white font-bold text-lg">PP</span>
+            </div>
+          </div>
+
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-[#10153E] mb-2">Welcome back</h1>
+            <p className="text-sm text-[#6B7098]">
+              Sign in to your account to manage posts and engagement.
+            </p>
+          </div>
 
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-[#FF6B6B]/10 border border-[#FF6B6B]/30 text-[#FF6B6B] text-sm">
-              {error}
-            </div>
+            <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#F2F5FF]">
-                Email
-              </Label>
+              <Label htmlFor="email" className="text-[#10153E]">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="you@company.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="bg-white/5 border-white/10 text-[#F2F5FF] placeholder:text-[#A7B1D8]/50 focus:border-[#4F6DFF] focus:ring-[#4F6DFF]/20 rounded-xl h-11"
+                className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#2D5AF6] focus:ring-[#2D5AF6]/20"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-[#F2F5FF]">
-                  Password
-                </Label>
-                <Link
-                  to="/auth/forgot-password"
-                  className="text-sm text-[#4F6DFF] hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
+              <Label htmlFor="password" className="text-[#10153E]">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -137,94 +123,72 @@ export default function Login() {
                   placeholder="Enter your password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="bg-white/5 border-white/10 text-[#F2F5FF] placeholder:text-[#A7B1D8]/50 focus:border-[#4F6DFF] focus:ring-[#4F6DFF]/20 rounded-xl h-11 pr-10"
+                  className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#2D5AF6] focus:ring-[#2D5AF6]/20 pr-12"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A7B1D8] hover:text-[#F2F5FF] transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7098] hover:text-[#10153E]"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
 
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="remember"
+                  checked={formData.rememberMe}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, rememberMe: checked as boolean })
+                  }
+                />
+                <Label htmlFor="remember" className="text-sm text-[#6B7098] cursor-pointer">
+                  Remember me
+                </Label>
+              </div>
+              <Link to="/auth/forgot-password" className="text-sm text-[#2D5AF6] hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+
             <Button
               type="submit"
+              className="w-full h-12 bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full font-medium"
               disabled={isLoading}
-              className="w-full bg-[#4F6DFF] hover:bg-[#3D5AEB] text-white rounded-xl h-11 font-medium"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  Sign in
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </>
-              )}
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-[#0B1022] text-[#A7B1D8]">Or sign in with</span>
-            </div>
+          <div className="flex items-center gap-4 my-6">
+            <Separator className="flex-1 bg-[#6B7098]/15" />
+            <span className="text-xs text-[#6B7098]">Or sign in with</span>
+            <Separator className="flex-1 bg-[#6B7098]/15" />
           </div>
 
-          <LinkedInButton />
+          <Button
+            variant="outline"
+            className="w-full h-12 rounded-full border-[#6B7098]/20 hover:bg-[#F6F8FC]"
+            onClick={handleLinkedIn}
+            type="button"
+          >
+            <Linkedin className="w-5 h-5 mr-2 text-[#0077B5]" />
+            Continue with LinkedIn
+          </Button>
 
-          <p className="text-center mt-6 text-sm text-[#A7B1D8]">
+          <p className="text-center mt-6 text-sm text-[#6B7098]">
             Don&apos;t have an account?{' '}
-            <Link to="/auth/signup" className="text-[#4F6DFF] hover:underline font-medium">
+            <Link to="/auth/signup" className="text-[#2D5AF6] hover:underline font-medium">
               Sign up
             </Link>
           </p>
         </div>
-
-        {/* Back to home */}
-        <p className="text-center mt-6">
-          <Link to="/" className="text-sm text-[#A7B1D8] hover:text-[#F2F5FF] transition-colors">
-            &larr; Back to home
-          </Link>
-        </p>
       </div>
     </div>
   );
-}
+};
 
-function LinkedInButton() {
-  const { signInWithLinkedIn } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleLinkedInSignIn = async () => {
-    setIsLoading(true);
-    await signInWithLinkedIn();
-    setIsLoading(false);
-  };
-
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      onClick={handleLinkedInSignIn}
-      disabled={isLoading}
-      className="w-full border-white/20 text-[#F2F5FF] hover:bg-white/10 rounded-xl h-11"
-    >
-      {isLoading ? (
-        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-      ) : (
-        <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-        </svg>
-      )}
-      Continue with LinkedIn
-    </Button>
-  );
-}
+export default Login;

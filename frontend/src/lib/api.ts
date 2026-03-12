@@ -1,81 +1,102 @@
-import { supabase } from './supabase';
-import { OAUTH_BACKEND_URL } from './config';
+import { API_URL } from './config';
 
-async function getFreshToken(): Promise<string> {
-  const { data: { session }, error } = await supabase.auth.getSession();
+export type ApiOptions = {
+  token?: string | null;
+  body?: unknown;
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  adminKey?: string;
+};
 
-  if (error || !session) throw new Error('Not authenticated');
-
-  const expiresAt = session.expires_at ?? 0;
-  const now = Math.floor(Date.now() / 1000);
-
-  if (expiresAt - now < 60) {
-    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshError || !refreshed.session) throw new Error('Session refresh failed');
-    return refreshed.session.access_token;
+export async function api<T = unknown>(
+  path: string,
+  options: ApiOptions = {}
+): Promise<T> {
+  const { token, body, method = 'GET', adminKey } = options;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
-
-  return session.access_token;
-}
-
-function backendUrl(): string {
-  return OAUTH_BACKEND_URL || 'http://localhost:4000';
-}
-
-export async function apiPost(path: string, body: Record<string, unknown>) {
-  const token = await getFreshToken();
-
-  const res = await fetch(`${backendUrl()}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
+  if (adminKey) {
+    headers['X-Admin-Key'] = adminKey;
+  }
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   });
-
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `Request failed: ${res.status}`);
+    throw new Error(data?.error || data?.message || `Request failed: ${res.status}`);
   }
-
-  return res.json();
+  return data as T;
 }
 
-export async function apiGet(path: string) {
-  const token = await getFreshToken();
+export const apiCalls = {
+  generate: (token: string) =>
+    api<{ success: boolean }>('/api/generate', { token, method: 'POST', body: {} }),
 
-  const res = await fetch(`${backendUrl()}${path}`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  getGenerationPaused: (token: string) =>
+    api<{ generation_paused: boolean }>('/api/settings/generation-paused', { token }),
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `Request failed: ${res.status}`);
-  }
+  setGenerationPaused: (token: string, paused: boolean) =>
+    api<{ success: boolean; generation_paused: boolean }>('/api/settings/generation-paused', {
+      token,
+      method: 'PATCH',
+      body: { paused },
+    }),
 
-  return res.json();
-}
+  regenerateImage: (token: string, postId: string) =>
+    api<{ success: boolean; media_url?: string }>('/api/regenerate-image', {
+      token,
+      method: 'POST',
+      body: { postId },
+    }),
 
-export async function apiPatch(path: string, body: Record<string, unknown>) {
-  const token = await getFreshToken();
+  generateImageForPost: (token: string, postId: string) =>
+    api<{ success: boolean; media_url?: string }>('/api/generate-image-for-post', {
+      token,
+      method: 'POST',
+      body: { postId },
+    }),
 
-  const res = await fetch(`${backendUrl()}${path}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
+  regeneratePost: (token: string, postId: string) =>
+    api<{ success: boolean; hook?: string; content?: string; hashtags?: string[] }>(
+      '/api/regenerate-post',
+      { token, method: 'POST', body: { postId } }
+    ),
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `Request failed: ${res.status}`);
-  }
+  publishNow: (token: string, postId: string) =>
+    api<{ success: boolean; postUrn?: string }>('/api/publish-now', {
+      token,
+      method: 'POST',
+      body: { postId },
+    }),
 
-  return res.json();
-}
+  loginEmail: (email: string, password: string, redirect?: string) =>
+    api<{ redirectUrl: string }>('/auth/login-email', {
+      method: 'POST',
+      body: { email, password, redirect },
+    }),
+
+  adminHealth: (adminKey: string) =>
+    api<unknown>('/admin/health', { adminKey }),
+
+  adminHealthRun: (adminKey: string) =>
+    api<unknown>('/admin/health/run', { adminKey, method: 'POST', body: {} }),
+
+  adminErrors: (adminKey: string, limit?: number) =>
+    api<{ id: string; created_at: string; message?: string }[]>(
+      `/admin/errors${limit ? `?limit=${limit}` : ''}`,
+      { adminKey }
+    ),
+
+  adminResolveError: (adminKey: string, id: string) =>
+    api<{ resolved: boolean }>(`/admin/errors/${id}/resolve`, {
+      adminKey,
+      method: 'POST',
+      body: {},
+    }),
+};

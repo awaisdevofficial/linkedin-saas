@@ -2,6 +2,7 @@ import * as supabase from '../services/supabase.service.js';
 import * as promptService from '../services/prompt.service.js';
 import * as openai from '../services/openai.service.js';
 import * as linkedin from '../services/linkedin.service.js';
+import { logger } from '../utils/logger.js';
 
 const CUTOFF_MS = 48 * 60 * 60 * 1000;
 
@@ -10,8 +11,11 @@ export async function runReplyJob() {
   let replied = 0;
   const errors = [];
 
+  logger.automation('reply_job_start', { timestamp: ts });
+
   try {
     const users = await supabase.getAllActiveUsers();
+    logger.automation('reply_job_users', { userCount: users.length });
 
     for (const user of users) {
       const userId = user.user_id;
@@ -83,20 +87,23 @@ export async function runReplyJob() {
                 status: 'completed',
               });
               replied++;
+              logger.automation('reply_job_replied', { userId, commentUrn: comment.commentUrn });
             } catch (e) {
+              logger.automation('reply_job_comment_error', { userId, commentUrn: comment.commentUrn, error: e.message });
               errors.push({ userId, commentUrn: comment.commentUrn, error: e.message });
             }
           }
         }
       } catch (e) {
+        logger.automation('reply_job_user_error', { userId, error: e.message });
         errors.push({ userId, action: 'reply', error: e.message });
       }
     }
 
-    console.log(JSON.stringify({ timestamp: new Date().toISOString(), job: 'reply', replied, errors }));
+    logger.automation('reply_job_done', { replied, errorCount: errors.length });
     return { replied, errors };
   } catch (e) {
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), job: 'reply', status: 'error', error: e.message }));
+    logger.automation('reply_job_fatal', { error: e.message });
     return { replied: 0, errors: [...errors, { error: e.message }] };
   }
 }

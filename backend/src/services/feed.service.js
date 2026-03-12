@@ -44,17 +44,21 @@ export async function fetchLinkedInFeed(liAtCookie, csrfToken) {
         const activityId = activityMatch[1];
         const cleanUrn = `urn:li:activity:${activityId}`;
 
-        const commentary = el.commentary?.text || el.text?.text || '';
+        const commentary =
+          (typeof el.commentary === 'string' ? el.commentary : el.commentary?.text) ||
+          el.text?.text ||
+          '';
         const authorUrn = el.actor?.['*actor'] || '';
         const author = included.find((i) => i.entityUrn === authorUrn);
         const authorName = author?.firstName
           ? `${author.firstName} ${author.lastName || ''}`.trim()
           : author?.name || '';
+        const description = `${authorName}: ${commentary}`.trim().slice(0, 500) || `Post by ${authorName || 'someone'}`;
 
         items.push({
           activity_id: activityId,
           uri: cleanUrn,
-          description: `${authorName}: ${commentary}`.trim().slice(0, 500),
+          description: description,
         });
       } catch (_) {
         continue;
