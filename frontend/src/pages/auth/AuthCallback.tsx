@@ -44,8 +44,19 @@ const AuthCallback = () => {
         }
 
         if (session) {
-          // Full page redirect so the app loads with session in storage (avoids auth-context race)
-          window.location.replace('/dashboard');
+          // New users: send to onboarding; returning users (have content settings) go to dashboard
+          let hasCompletedOnboarding = false;
+          try {
+            const { data: settings } = await supabase
+              .from('user_content_settings')
+              .select('user_id')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            hasCompletedOnboarding = !!settings?.user_id;
+          } catch {
+            // On error (e.g. RLS), send to onboarding so user isn't stuck
+          }
+          window.location.replace(hasCompletedOnboarding ? '/dashboard' : '/onboarding');
           return;
         } else {
           const params = new URLSearchParams(window.location.search);
