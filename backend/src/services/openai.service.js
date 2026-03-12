@@ -1,28 +1,17 @@
 /**
- * AI usage: images = Gemini (preferred) or OpenAI DALL-E. Content, comments, replies = Groq only.
+ * AI usage: images = Gemini only. Content, comments, replies, visual prompts = Groq only.
  */
-import OpenAI from 'openai';
 import Groq from 'groq-sdk';
 import axios from 'axios';
 
-const apiKey = process.env.OPENAI_API_KEY;
 const groqClient = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
   : null;
-let client = null;
-if (apiKey?.trim()) {
-  client = new OpenAI({ apiKey: apiKey.trim() });
-}
 
-/** True if the error is an OpenAI rate limit (429). */
+/** True if the error is a rate limit (429). */
 function isRateLimitError(e) {
   const status = e?.status ?? e?.statusCode ?? e?.response?.status;
   return status === 429;
-}
-
-function getClient() {
-  if (!client) throw new Error('OpenAI client not initialized: set OPENAI_API_KEY for image generation');
-  return client;
 }
 
 const SYSTEM_PROMPT = `You are a ghostwriter for a LinkedIn thought leader.
@@ -211,18 +200,19 @@ Given the post hook and content, return ONLY valid JSON with no markdown, no bac
 }
 Keep it professional and suitable for a LinkedIn post graphic.`;
 
-/** Visual prompt for images: OpenAI only. */
+/** Visual prompt for images: Groq. */
 export async function generateVisualPromptFromPost(hook, content) {
-  const openai = getClient(); // requires OPENAI_API_KEY
+  if (!groqClient) throw new Error('GROQ_API_KEY required for visual prompt generation');
   const text = [hook, content].filter(Boolean).join('\n\n').slice(0, 1500);
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+  const completion = await groqClient.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: VISUAL_PROMPT_SYSTEM },
       { role: 'user', content: text || 'Professional LinkedIn post' },
     ],
     response_format: { type: 'json_object' },
     temperature: 0.5,
+    max_tokens: 1024,
   });
   const raw = completion.choices?.[0]?.message?.content?.trim() || '{}';
   return JSON.parse(raw);
@@ -244,16 +234,6 @@ Professional LinkedIn post image. Dark background. Clean typography. No people. 
 async function generateImageWithGemini(visualPrompt) {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return null;
-  // Google AI Studio keys start with AIza; other formats may be invalid for this API
-  if (!apiKey.startsWith('AIza')) {
-    console.error(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'gemini',
-      action: 'generateImage',
-      error: 'GEMINI_API_KEY should be from Google AI Studio (starts with AIza). Get one at https://aistudio.google.com/apikey',
-    }));
-    return null;
-  }
   const prompt = buildImagePrompt(visualPrompt);
   const url = `${GEMINI_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent`;
   try {
@@ -296,34 +276,17 @@ async function generateImageWithGemini(visualPrompt) {
   }
 }
 
-/** Images: Gemini (preferred when GEMINI_API_KEY set) or OpenAI DALL-E. Returns URL (string) or Buffer. */
+/** Images: Gemini only. Returns Buffer or null. */
 export async function generateImage(visualPrompt) {
   try {
     if (!visualPrompt || typeof visualPrompt !== 'object') {
       return null;
     }
-    if (process.env.GEMINI_API_KEY?.trim()) {
-      const buffer = await generateImageWithGemini(visualPrompt);
-      if (buffer) return buffer;
-    }
-    if (process.env.OPENAI_API_KEY?.trim()) {
-      const openai = getClient();
-      const prompt = buildImagePrompt(visualPrompt);
-      const response = await openai.images.generate({
-        model: 'dall-e-3',
-        prompt,
-        size: '1792x1024',
-        quality: 'standard',
-        n: 1,
-      });
-      const url = response.data?.[0]?.url ?? null;
-      if (url) return url;
-    }
-    return null;
+    return await generateImageWithGemini(visualPrompt);
   } catch (e) {
     console.error(JSON.stringify({
       timestamp: new Date().toISOString(),
-      service: process.env.GEMINI_API_KEY ? 'gemini' : 'openai',
+      service: 'gemini',
       action: 'generateImage',
       error: e.message
     }));

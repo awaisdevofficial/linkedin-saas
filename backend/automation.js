@@ -9,8 +9,11 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const { startScheduler } = await import('./src/scheduler/index.js');
 const { logger } = await import('./src/utils/logger.js');
 
-if (!process.env.OPENAI_API_KEY?.trim()) {
-  logger.automation('openai_key_missing', { hint: 'AI jobs will fail without OPENAI_API_KEY' });
+if (!process.env.GEMINI_API_KEY?.trim()) {
+  logger.automation('gemini_key_missing', { hint: 'Image generation will be skipped without GEMINI_API_KEY' });
+}
+if (!process.env.GROQ_API_KEY?.trim()) {
+  logger.automation('groq_key_missing', { hint: 'Content/comment/reply generation will fail without GROQ_API_KEY' });
 }
 
 logger.automation('automation_engine_starting');

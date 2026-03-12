@@ -481,14 +481,12 @@ app.post('/api/regenerate-image', async (req, res) => {
 
 // POST /api/generate-image-for-post — generate image for a post (creates visual_prompt from text if missing)
 app.post('/api/generate-image-for-post', async (req, res) => {
-  // Skip if no image provider configured (OpenAI or Gemini)
-  const hasOpenAI = !!process.env.OPENAI_API_KEY?.trim();
-  const hasGemini = !!process.env.GEMINI_API_KEY?.trim();
-  if (!hasOpenAI && !hasGemini) {
+  // Skip if Gemini not configured for image generation
+  if (!process.env.GEMINI_API_KEY?.trim()) {
     return res.status(503).json({
       error: 'Image generation not available',
       reason: 'no_image_url',
-      message: 'Set OPENAI_API_KEY or GEMINI_API_KEY on the server to enable image generation.',
+      message: 'Set GEMINI_API_KEY (from Google AI Studio: https://aistudio.google.com/apikey) in backend/.env and restart the server.',
     });
   }
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -519,7 +517,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
       return res.status(503).json({
         error: 'Image generation unavailable',
         code: 'IMAGE_SERVICE_UNAVAILABLE',
-        message: 'Image generation failed. Set a valid OPENAI_API_KEY or GEMINI_API_KEY (from Google AI Studio) in backend/.env and restart the server. Check server logs for details.',
+        message: 'Image generation failed. Set a valid GEMINI_API_KEY (from Google AI Studio) in backend/.env and restart the server. Check server logs for details.',
       });
     }
     const mediaUrl = await imageService.processAndUploadImage(user.id, imageUrl);
@@ -534,12 +532,12 @@ app.post('/api/generate-image-for-post', async (req, res) => {
     return res.status(200).json({ success: true, media_url: mediaUrl });
   } catch (e) {
     logger.api('generate_image_for_post_error', { postId: req.body?.postId, error: e.message });
-    const isAuthOrConfig = /OPENAI|API key|401|not initialized/i.test(e.message || '');
+    const isAuthOrConfig = /GEMINI|API key|401|not initialized/i.test(e.message || '');
     if (isAuthOrConfig) {
       return res.status(503).json({
         error: 'Image generation unavailable',
         code: 'IMAGE_SERVICE_UNAVAILABLE',
-        message: 'Image generation requires a valid OpenAI API key on the server.',
+        message: 'Image generation requires a valid GEMINI_API_KEY (from Google AI Studio) on the server.',
       });
     }
     return res.status(500).json({ error: e.message || 'Generate image for post failed' });
