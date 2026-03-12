@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 
@@ -10,8 +10,12 @@ import { supabase } from '@/lib/supabase';
 const AuthCallback = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const runOnce = useRef(false);
 
   useEffect(() => {
+    if (runOnce.current) return;
+    runOnce.current = true;
+
     const run = async () => {
       if (!supabase) {
         setError('Supabase not configured');
@@ -88,11 +92,17 @@ const AuthCallback = () => {
     );
   }
 
+  const hasHash = typeof window !== 'undefined' && window.location.hash?.includes('access_token=');
   return (
     <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
       <div className="text-center">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] flex items-center justify-center mx-auto mb-4 animate-pulse" />
-        <p className="text-[#6B7098]">Signing you in...</p>
+        <p className="text-[#6B7098] mb-4">Signing you in...</p>
+        {hasHash && (
+          <p className="text-sm text-[#6B7098]">
+            If nothing happens, <a href="/dashboard" className="text-[#2D5AF6] hover:underline font-medium">continue to Dashboard</a>.
+          </p>
+        )}
       </div>
     </div>
   );
