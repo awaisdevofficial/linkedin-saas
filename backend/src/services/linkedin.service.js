@@ -305,9 +305,10 @@ export async function getPostComments(credentials, postUrn) {
   };
 
   try {
-    // Step 1 — fetch the post to get the real activity URN
+    // Step 1 — fetch the post to get the real activity URN (try ugcPost first — that's what we store — fall back to share)
+    const voyagerUrn = postUrn.startsWith('urn:li:ugcPost:') ? postUrn : `urn:li:share:${urnId}`;
     const postRes = await axios.get(
-      `https://www.linkedin.com/voyager/api/feed/updates/${encodeURIComponent(`urn:li:share:${urnId}`)}`,
+      `https://www.linkedin.com/voyager/api/feed/updates/${encodeURIComponent(voyagerUrn)}`,
       { headers }
     );
 
