@@ -91,3 +91,32 @@ export async function processAndUploadImage(userId, urlOrBuffer) {
     return null;
   }
 }
+
+/**
+ * Download video from URL and upload to Supabase storage. Returns public URL or null.
+ */
+export async function uploadVideoFromUrl(userId, videoUrl) {
+  try {
+    const response = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 120000 });
+    const buffer = Buffer.from(response.data);
+    const supabase = getSupabase();
+    const fileName = `${userId}/${Date.now()}.mp4`;
+    const bucket = 'post-media';
+    await supabase.storage.createBucket(bucket, { public: true }).catch(() => {});
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, buffer, { contentType: 'video/mp4', upsert: true });
+    if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    return urlData.publicUrl;
+  } catch (e) {
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'image',
+      action: 'uploadVideoFromUrl',
+      userId,
+      error: e.message,
+    }));
+    return null;
+  }
+}

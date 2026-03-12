@@ -1,8 +1,8 @@
 /**
- * AI usage: images = Gemini only. Content, comments, replies, visual prompts = Groq only.
+ * AI usage: content, comments, replies, visual prompts = Groq only.
+ * Images/video = Freepik (user API key) via freepik.service.js.
  */
 import Groq from 'groq-sdk';
-import axios from 'axios';
 
 const groqClient = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -218,94 +218,9 @@ export async function generateVisualPromptFromPost(hook, content) {
   return JSON.parse(raw);
 }
 
-const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-
-/** Build text prompt from visual_prompt object for image generation. */
-function buildImagePrompt(visualPrompt) {
+/** Build text prompt from visual_prompt for Freepik/image generation. */
+export function buildImagePromptFromVisual(visualPrompt) {
+  if (!visualPrompt || typeof visualPrompt !== 'object') return '';
   const v = visualPrompt;
-  return `${v.visual_concept || 'Professional graphic'}. 
-Style: ${v.design_style || 'minimal, clean, professional'}. 
-Text overlay: "${v.headline_text || ''}".
-Professional LinkedIn post image. Dark background. Clean typography. No people. No faces. Minimalist.`;
-}
-
-/** Generate image via Gemini API; returns Buffer or null. */
-async function generateImageWithGemini(visualPrompt) {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
-    console.error(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'gemini',
-      action: 'generateImage',
-      error: 'GEMINI_API_KEY is empty or not set in process.env. Ensure backend/.env is loaded (e.g. dotenv in server.js).',
-    }));
-    return null;
-  }
-  const prompt = buildImagePrompt(visualPrompt);
-  const url = `${GEMINI_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent`;
-  try {
-    const res = await axios.post(
-      url,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseModalities: ['IMAGE', 'TEXT'],
-        },
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        timeout: 60000,
-        responseType: 'json',
-      }
-    );
-    const parts = res.data?.candidates?.[0]?.content?.parts ?? [];
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        return Buffer.from(part.inlineData.data, 'base64');
-      }
-    }
-    console.error(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'gemini',
-      action: 'generateImage',
-      error: 'Gemini returned 200 but no image in response',
-      hasCandidates: !!res.data?.candidates?.length,
-      partsLength: parts.length,
-    }));
-    return null;
-  } catch (e) {
-    const status = e.response?.status;
-    const body = e.response?.data;
-    console.error(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'gemini',
-      action: 'generateImage',
-      error: e.message,
-      status,
-      detail: body?.error?.message || (typeof body === 'object' ? JSON.stringify(body).slice(0, 200) : body),
-    }));
-    return null;
-  }
-}
-
-/** Images: Gemini only. Returns Buffer or null. */
-export async function generateImage(visualPrompt) {
-  try {
-    if (!visualPrompt || typeof visualPrompt !== 'object') {
-      return null;
-    }
-    return await generateImageWithGemini(visualPrompt);
-  } catch (e) {
-    console.error(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'gemini',
-      action: 'generateImage',
-      error: e.message
-    }));
-    return null;
-  }
+  return `${v.visual_concept || 'Professional graphic'}. Style: ${v.design_style || 'minimal, clean, professional'}. Text overlay: "${v.headline_text || ''}". Professional LinkedIn post image. Dark background. Clean typography. No people. No faces. Minimalist.`;
 }

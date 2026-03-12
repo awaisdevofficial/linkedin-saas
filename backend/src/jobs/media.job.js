@@ -1,5 +1,6 @@
 import * as supabase from '../services/supabase.service.js';
 import * as openai from '../services/openai.service.js';
+import * as freepik from '../services/freepik.service.js';
 import * as imageService from '../services/image.service.js';
 import { logger } from '../utils/logger.js';
 
@@ -21,10 +22,17 @@ export async function runMediaJob() {
         const posts = await supabase.getPendingMediaPosts(userId);
         logger.automation('media_job_pending', { userId, pendingCount: posts?.length ?? 0 });
 
+        const settings = await supabase.getUserContentSettings(userId);
+        const apiKey = settings?.freepik_api_key?.trim();
+        if (!apiKey) {
+          logger.automation('media_job_skip', { userId, reason: 'no_freepik_key' });
+          continue;
+        }
         for (const post of posts) {
           try {
             logger.automation('media_job_step', { postId: post.id, step: 'generateImage' });
-            const imageUrl = await openai.generateImage(post.visual_prompt);
+            const prompt = openai.buildImagePromptFromVisual(post.visual_prompt);
+            const imageUrl = await freepik.generateImage(apiKey, prompt, 'widescreen_16_9');
             if (!imageUrl) {
               logger.automation('media_job_skip', { postId: post.id, step: 'generateImage', reason: 'null' });
               continue;

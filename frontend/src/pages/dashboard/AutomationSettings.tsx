@@ -39,6 +39,7 @@ const AutomationSettings = () => {
     custom_comment_prompt?: string;
     custom_reply_prompt?: string;
     enable_post_comment?: boolean;
+    freepik_api_key?: string;
   } | null>(null);
   const [engageSettings, setEngageSettings] = useState<Record<string, unknown>>({});
   const [activeTab, setActiveTab] = useState('post');
@@ -203,6 +204,25 @@ const AutomationSettings = () => {
                   checked={contentSettings?.enable_post_comment !== false}
                   onCheckedChange={(checked) => setContentSettings((s) => ({ ...(s || {}), enable_post_comment: checked }))}
                   disabled={!!saving}
+                />
+              </div>
+              <Separator className="bg-[#e2e8f0]" />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-[#334155]">Freepik API key (image & video generation)</Label>
+                <p className="text-xs text-[#64748b]">
+                  Your key is stored securely and used only for generating post images and videos. Get one at{' '}
+                  <a href="https://www.freepik.com/api/image-generation" target="_blank" rel="noopener noreferrer" className="text-[#2D5AF6] hover:underline">
+                    Freepik API
+                  </a>
+                  .
+                </p>
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  value={contentSettings?.freepik_api_key || ''}
+                  onChange={(e) => setContentSettings((s) => ({ ...(s || {}), freepik_api_key: e.target.value }))}
+                  placeholder="Paste your Freepik API key"
+                  className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] font-mono text-sm"
                 />
               </div>
               <Separator className="bg-[#e2e8f0]" />

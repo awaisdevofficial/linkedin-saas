@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Repeat2,
   Linkedin,
+  Video,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +57,7 @@ type Post = {
   status: string;
   posted: boolean;
   media_url: string | null;
+  video_url?: string | null;
   created_at: string;
   scheduled_at: string | null;
 };
@@ -96,7 +98,7 @@ const PostsActivity = () => {
       const [postsRes, profileRes] = await Promise.all([
         client
           .from('posts')
-          .select('id, hook, content, hashtags, status, posted, media_url, created_at, scheduled_at')
+          .select('id, hook, content, hashtags, status, posted, media_url, video_url, created_at, scheduled_at')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false }),
         client.from('profiles').select('avatar_url').eq('id', user.id).maybeSingle(),
@@ -125,7 +127,7 @@ const PostsActivity = () => {
         () => {
           client
             .from('posts')
-            .select('id, hook, content, hashtags, status, posted, media_url, created_at, scheduled_at')
+            .select('id, hook, content, hashtags, status, posted, media_url, video_url, created_at, scheduled_at')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .then((res) => setPosts((res.data as Post[]) || []));
@@ -217,10 +219,33 @@ const PostsActivity = () => {
     if (!accessToken) return;
     setActionLoading(postId);
     try {
-      await apiCalls.generateImageForPost(accessToken, postId);
+      const res = await apiCalls.generateImageForPost(accessToken, postId);
+      if (res.media_url) {
+        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, media_url: res.media_url! } : p)));
+        if (viewPost?.id === postId) setViewPost((prev) => (prev ? { ...prev, media_url: res.media_url! } : null));
+      }
       toast.success('Image generated');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Image generation failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleGenerateVideo = async (postId: string) => {
+    if (!accessToken) return;
+    setActionLoading(postId);
+    try {
+      const res = await apiCalls.generateVideoForPost(accessToken, postId);
+      if (res.video_url) {
+        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, video_url: res.video_url! } : p)));
+        if (viewPost?.id === postId) setViewPost((prev) => (prev ? { ...prev, video_url: res.video_url! } : null));
+        toast.success('Video generated and uploaded');
+      } else {
+        toast.success('Video generation started');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Video generation failed');
     } finally {
       setActionLoading(null);
     }
@@ -772,6 +797,11 @@ const PostsActivity = () => {
                       />
                     </div>
                   )}
+                  {viewPost.video_url && (
+                    <div className="w-full mt-2 bg-black rounded-lg overflow-hidden">
+                      <video src={viewPost.video_url} controls className="w-full max-h-[400px]" playsInline />
+                    </div>
+                  )}
 
                   {/* Engagement bar - LinkedIn style */}
                   <div className="px-4 py-2 border-t border-[#00000014]">
@@ -821,6 +851,21 @@ const PostsActivity = () => {
                         )}
                         Regenerate picture
                       </Button>
+                      {viewPost.media_url && (
+                        <Button
+                          variant="outline"
+                          className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                          onClick={() => handleGenerateVideo(viewPost.id)}
+                          disabled={!!actionLoading}
+                        >
+                          {actionLoading === viewPost.id ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Video className="w-4 h-4 mr-2" />
+                          )}
+                          {viewPost.video_url ? 'Regenerate video' : 'Generate video'}
+                        </Button>
+                      )}
                       <Button
                         className="bg-[#0A66C2] hover:bg-[#004182] rounded-full"
                         onClick={() => {

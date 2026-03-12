@@ -1,5 +1,6 @@
 import * as supabase from '../services/supabase.service.js';
 import * as openai from '../services/openai.service.js';
+import * as freepik from '../services/freepik.service.js';
 import * as rss from '../services/rss.service.js';
 import * as imageService from '../services/image.service.js';
 import { logger } from '../utils/logger.js';
@@ -82,10 +83,11 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
               logger.automation('generate_job_post_created', { userId, postId });
             }
 
-            // Generate and attach image so user sees post + picture together
-            if (postId && result.visual_prompt) {
+            // Generate and attach image via Freepik (if user has API key)
+            if (postId && result.visual_prompt && settings?.freepik_api_key?.trim()) {
               try {
-                const imageUrl = await openai.generateImage(result.visual_prompt);
+                const prompt = openai.buildImagePromptFromVisual(result.visual_prompt);
+                const imageUrl = await freepik.generateImage(settings.freepik_api_key.trim(), prompt, 'widescreen_16_9');
                 if (imageUrl) {
                   const mediaUrl = await imageService.processAndUploadImage(userId, imageUrl);
                   if (mediaUrl) {

@@ -82,7 +82,7 @@ export async function getUserContentSettings(userId) {
         enable_post_comment: true,
       };
     }
-    return { ...data, generation_paused: data.generation_paused === true, enable_post_comment: data.enable_post_comment !== false };
+    return { ...data, generation_paused: data.generation_paused === true, enable_post_comment: data.enable_post_comment !== false, freepik_api_key: data.freepik_api_key || null };
   } catch (e) {
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getUserContentSettings', userId, error: e.message }));
     return {
