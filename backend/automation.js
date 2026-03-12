@@ -5,8 +5,9 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-import { startScheduler } from './src/scheduler/index.js';
-import { logger } from './src/utils/logger.js';
+// Load scheduler and logger after .env so supabase.service.js sees SUPABASE_* (ESM hoists imports before body)
+const { startScheduler } = await import('./src/scheduler/index.js');
+const { logger } = await import('./src/utils/logger.js');
 
 if (!process.env.OPENAI_API_KEY?.trim()) {
   logger.automation('openai_key_missing', { hint: 'AI jobs will fail without OPENAI_API_KEY' });
