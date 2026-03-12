@@ -15,6 +15,17 @@ import { toast } from 'sonner';
 
 const niches = ['Tech', 'Marketing', 'Finance', 'Sales', 'HR', 'AI', 'Custom'];
 
+const ENGAGEMENT_INTERVAL_OPTIONS = [
+  { value: 15, label: '15 minutes' },
+  { value: 30, label: '30 minutes' },
+  { value: 60, label: '1 hour' },
+  { value: 120, label: '2 hours' },
+  { value: 360, label: '6 hours' },
+  { value: 720, label: '12 hours' },
+  { value: 1440, label: '1 day' },
+  { value: 10080, label: '1 week' },
+] as const;
+
 const AutomationSettings = () => {
   const { user, accessToken } = useAuth();
   const [generationPaused, setGenerationPaused] = useState(false);
@@ -257,6 +268,21 @@ const AutomationSettings = () => {
               <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
                 <Label className="text-sm font-medium text-[#334155] cursor-pointer">Enable comment on feed posts</Label>
                 <Switch checked={engageSettings?.auto_commenting !== false} onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_commenting: checked }))} disabled={!!saving} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-[#334155]">Wait between each like or comment</Label>
+                <p className="text-xs text-[#64748b]">Minimum 15 minutes, maximum 1 week. How long to wait before the next like or comment on other posts.</p>
+                <select
+                  value={Math.min(10080, Math.max(15, Number(engageSettings?.engagement_interval_minutes) || 15))}
+                  onChange={(e) => setEngageSettings((s) => ({ ...s, engagement_interval_minutes: Number(e.target.value) }))}
+                  className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5AF6]"
+                >
+                  {ENGAGEMENT_INTERVAL_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-[#334155]">Comment prompt</Label>

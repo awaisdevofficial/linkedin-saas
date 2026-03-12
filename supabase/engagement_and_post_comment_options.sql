@@ -14,3 +14,7 @@ ADD COLUMN IF NOT EXISTS auto_commenting boolean DEFAULT true;
 
 ALTER TABLE public.engagement_settings
 ADD COLUMN IF NOT EXISTS auto_replying boolean DEFAULT true;
+
+-- Interval between each like/comment on other posts (minutes). Min 15, max 10080 (1 week).
+ALTER TABLE public.engagement_settings
+ADD COLUMN IF NOT EXISTS engagement_interval_minutes integer DEFAULT 15;

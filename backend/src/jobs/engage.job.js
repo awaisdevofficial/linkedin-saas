@@ -60,7 +60,9 @@ export async function runEngageJob() {
           csrfToken: user.csrfToken,
         };
 
-        const intervalMs = (settings.engagement_interval_minutes || 15) * 60 * 1000;
+        const rawMinutes = settings.engagement_interval_minutes ?? 15;
+        const clampedMinutes = Math.min(10080, Math.max(15, Number(rawMinutes) || 15));
+        const intervalMs = clampedMinutes * 60 * 1000;
 
         for (const item of shuffled) {
           const currentCount = await supabase.getDailyEngagementCount(userId);
