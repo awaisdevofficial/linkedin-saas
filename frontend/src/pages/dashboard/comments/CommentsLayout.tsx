@@ -3,10 +3,10 @@ import { List, Settings } from 'lucide-react';
 
 export default function CommentsLayout() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       <div>
         <h1 className="text-2xl sm:text-3xl font-semibold text-[#F2F5FF]">Comments</h1>
-        <p className="text-[#A7B1D8] mt-1">Automate commenting on LinkedIn</p>
+        <p className="text-[#A7B1D8] mt-1 text-sm">Review and manage automated comments on your feed.</p>
       </div>
 
       <nav className="flex gap-1 p-1 rounded-xl bg-white/5 border border-white/10 w-fit">

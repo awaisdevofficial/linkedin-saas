@@ -55,8 +55,8 @@ export default function Signup() {
           <h1 className="text-2xl font-semibold text-[#F2F5FF] mb-2 text-center">
             Create your account
           </h1>
-          <p className="text-[#A7B1D8] text-center mb-8">
-            Start your free 14-day trial. No credit card required.
+          <p className="text-[#A7B1D8] text-center mb-8 text-sm">
+            Get started in seconds. No credit card required.
           </p>
 
           {error && (

@@ -1,9 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* App (non-landing) uses Manrope. Landing page keeps Inter + Space Grotesk via .landing-root */
 @layer base {
   :root {
     --background: 222 47% 4%;
@@ -48,15 +49,45 @@
   
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Manrope', sans-serif;
   }
-  
+
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Manrope', sans-serif;
   }
-  
+
   code, pre, .mono {
     font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Form controls: readable, professional text (no tiny or forced lowercase) */
+  select,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="time"],
+  textarea {
+    font-size: 1rem;
+    font-variant: normal;
+    text-transform: none;
+  }
+
+  /* Landing page only: keep original fonts */
+  .landing-root,
+  .landing-root * {
+    font-family: inherit;
+  }
+  .landing-root {
+    font-family: 'Inter', sans-serif;
+  }
+  .landing-root h1,
+  .landing-root h2,
+  .landing-root h3,
+  .landing-root h4,
+  .landing-root h5,
+  .landing-root h6 {
+    font-family: 'Space Grotesk', sans-serif;
   }
 }
 

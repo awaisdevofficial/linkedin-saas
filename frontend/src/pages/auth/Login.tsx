@@ -92,8 +92,8 @@ export default function Login() {
           <h1 className="text-2xl font-semibold text-[#F2F5FF] mb-2 text-center">
             Welcome back
           </h1>
-          <p className="text-[#A7B1D8] text-center mb-8">
-            Sign in to your PostPilot account
+          <p className="text-[#A7B1D8] text-center mb-8 text-sm">
+            Sign in to your account to manage posts and engagement.
           </p>
 
           {error && (
@@ -174,7 +174,7 @@ export default function Login() {
               <div className="w-full border-t border-white/10" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-[#0B1022] text-[#A7B1D8]">Or continue with</span>
+              <span className="px-2 bg-[#0B1022] text-[#A7B1D8]">Or sign in with</span>
             </div>
           </div>
 

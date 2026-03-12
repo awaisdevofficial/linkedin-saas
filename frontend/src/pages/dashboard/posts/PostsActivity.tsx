@@ -90,7 +90,6 @@ export default function PostsActivity() {
   const [selectedPost, setSelectedPost] = useState<PostRow | null>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
-  const [generateLoading, setGenerateLoading] = useState(false);
   const [publishingPostId, setPublishingPostId] = useState<string | null>(null);
   const [scheduleModalPost, setScheduleModalPost] = useState<PostRow | null>(null);
   const [scheduleDateTime, setScheduleDateTime] = useState('');
@@ -165,6 +164,16 @@ export default function PostsActivity() {
       setSearchParams({}, { replace: true });
     }
   }, [postIdFromUrl, posts, setSearchParams]);
+
+  // Open "New Post" dialog when navigating from layout "Generate New Post" (?new=1)
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setNewPostOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Load generation_paused (API) and auto_replying (engagement_settings)
   useEffect(() => {
@@ -339,24 +348,6 @@ export default function PostsActivity() {
       alert(err instanceof Error ? err.message : 'Failed to regenerate post');
     } finally {
       setRegeneratingPost(false);
-    }
-  };
-
-  const handleGenerateNow = async () => {
-    if (!user?.id || !OAUTH_BACKEND_URL) return;
-    setGenerateLoading(true);
-    try {
-      await apiPost('/api/generate', { userId: user.id });
-      // Refetch after a short delay to pick up new posts
-      setTimeout(() => {
-        supabase.from('posts').select('id, user_id, hook, content, hashtags, status, scheduled_at, posted_at, engagement_count, has_media, media_type, suggested_comments, media_url, visual_prompt, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).then(({ data }) => {
-          if (data) setPosts(data as PostRow[]);
-        });
-      }, 3000);
-    } catch (_) {
-      // Error already thrown by apiPost
-    } finally {
-      setGenerateLoading(false);
     }
   };
 
@@ -603,17 +594,7 @@ export default function PostsActivity() {
               })}
               {filteredPosts.length === 0 && (
                 <div className="text-center py-8">
-                  <p className="text-[#A7B1D8] mb-4">{emptyMessage()}</p>
-                  {activeTab === 'all' && posts.length === 0 && OAUTH_BACKEND_URL && (
-                    <Button
-                      onClick={handleGenerateNow}
-                      disabled={generateLoading}
-                      className="bg-[#4F6DFF] hover:bg-[#3D5AEB] text-white rounded-xl"
-                    >
-                      {generateLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                      Generate Now →
-                    </Button>
-                  )}
+                  <p className="text-[#A7B1D8]">{emptyMessage()}</p>
                 </div>
               )}
             </div>

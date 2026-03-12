@@ -16,7 +16,7 @@ function shuffle(arr) {
 function isInActiveWindow(settings) {
   if (!settings?.active_days?.length) return false;
   const now = new Date();
-  const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+  const dayName = now.toLocaleDateString('en-US', { weekday: 'short' });
   if (!settings.active_days.includes(dayName)) return false;
   const start = String(settings.active_start_time || '08:00').slice(0, 5);
   const end = String(settings.active_end_time || '20:00').slice(0, 5);
@@ -37,18 +37,21 @@ export async function runEngageJob() {
       try {
         const settings = await supabase.getEngagementSettings(userId);
         if (!settings) continue;
-        if (!isInActiveWindow(settings)) continue;
+
+        const inWindow = isInActiveWindow(settings);
+        if (!inWindow) continue;
 
         const count = await supabase.getDailyEngagementCount(userId);
         if (count >= (settings.max_engagements_per_day || 50)) continue;
 
-        const feedItems = await feed.fetchLinkedInFeed(user.li_at_cookie);
+        const feedItems = await feed.fetchLinkedInFeed(user.li_at_cookie, user.csrfToken);
         const shuffled = shuffle(feedItems).slice(0, 5);
 
         const credentials = {
           accessToken: user.access_token,
           liAtCookie: user.li_at_cookie,
           personUrn: user.person_urn,
+          csrfToken: user.csrfToken,
         };
 
         const intervalMs = (settings.engagement_interval_minutes || 15) * 60 * 1000;

@@ -32,16 +32,14 @@ export async function processAndUploadImage(userId, dalleUrl) {
     const response = await axios.get(dalleUrl, { responseType: 'arraybuffer', timeout: 30000 });
     let imageBuffer = Buffer.from(response.data);
 
-    // 2. Resize to 1200x627 (LinkedIn optimal), then apply PostPilot watermark
+    // 2. Resize to 1200x627 then composite watermark bottom-right
     const watermark = createWatermarkSvg();
     imageBuffer = await sharp(imageBuffer)
       .resize(1200, 627, { fit: 'cover', position: 'center' })
       .composite([
         {
           input: watermark,
-          gravity: 'southeast',
-          top: undefined,
-          left: undefined,
+          gravity: 'southeast', // no top/left when using gravity
         }
       ])
       .png()

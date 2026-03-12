@@ -15,7 +15,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth-context';
-import { supabase } from '../lib/supabase';
+import { supabase, getAvatarDisplayUrl } from '../lib/supabase';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +38,40 @@ export default function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [hasLiAtCookie, setHasLiAtCookie] = useState<boolean | null>(null);
+  const [profile, setProfile] = useState<{ full_name: string; avatar_url: string | null } | null>(null);
+
+  // Load profile (name, avatar) for header display
+  useEffect(() => {
+    if (!user?.id) {
+      setProfile(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!cancelled && data) {
+        setProfile({
+          full_name: data.full_name ?? '',
+          avatar_url: data.avatar_url ?? null,
+        });
+      }
+    };
+    load();
+    const channel = supabase
+      .channel('layout-profile')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, () => {
+        load();
+      })
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   // Check if user has set li_at cookie (for posting, engagement, feed)
   useEffect(() => {
@@ -78,11 +112,11 @@ export default function DashboardLayout() {
     navigate('/');
   };
 
-  const userInitials = user?.user_metadata?.full_name 
-    ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
-    : user?.email?.[0].toUpperCase() || 'U';
-
-  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+  const displayName = profile?.full_name?.trim() || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
+  const userInitials = displayName
+    ? displayName.split(/\s+/).map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+    : user?.email?.[0]?.toUpperCase() || 'U';
+  const avatarUrl = getAvatarDisplayUrl(profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture);
 
   return (
     <div className="min-h-screen bg-[#070A12] flex">
@@ -164,10 +198,11 @@ export default function DashboardLayout() {
               </button>
               
               <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                <Search className="w-4 h-4 text-[#A7B1D8]" />
+                <Search className="w-4 h-4 text-[#A7B1D8]" aria-hidden />
                 <input
-                  type="text"
-                  placeholder="Search..."
+                  type="search"
+                  placeholder="Search posts, comments..."
+                  aria-label="Search"
                   className="bg-transparent text-sm text-[#F2F5FF] placeholder:text-[#A7B1D8]/50 outline-none w-48"
                 />
               </div>
@@ -183,10 +218,14 @@ export default function DashboardLayout() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 p-1.5 pr-3 rounded-xl hover:bg-white/5 transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4F6DFF] to-[#27C696] flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">{userInitials}</span>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4F6DFF] to-[#27C696] flex items-center justify-center overflow-hidden shrink-0">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-white font-semibold text-sm">{userInitials}</span>
+                      )}
                     </div>
-                    <span className="hidden sm:block text-sm text-[#F2F5FF]">{userName}</span>
+                    <span className="hidden sm:block text-sm text-[#F2F5FF]">{displayName}</span>
                     <ChevronDown className="w-4 h-4 text-[#A7B1D8]" />
                   </button>
                 </DropdownMenuTrigger>
@@ -220,16 +259,16 @@ export default function DashboardLayout() {
         {hasLiAtCookie === false && (
           <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 p-4 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" aria-hidden />
               <p className="text-sm">
-                Add your LinkedIn cookie (<code className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-xs">li_at</code>) in Settings so we can post, comment, and engage on your behalf.
+                Connect LinkedIn to get started: add your <code className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-xs">li_at</code> cookie in Settings so we can post, comment, and engage on your behalf.
               </p>
             </div>
             <Link
               to="/dashboard/settings"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/25 hover:bg-amber-500/35 text-amber-200 font-medium text-sm transition-colors shrink-0"
             >
-              Add cookie in Settings
+              Connect in Settings
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

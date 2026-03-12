@@ -17,6 +17,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+const PROFILE_PICTURE_BUCKET = 'profile-picture';
+
+/**
+ * Returns the URL to use for displaying a profile avatar.
+ * - If avatarUrl is a full URL (http/https), returns it as-is.
+ * - If it's a storage path, returns the public URL for the profile-picture bucket.
+ */
+export function getAvatarDisplayUrl(avatarUrl: string | null | undefined): string | null {
+  if (!avatarUrl?.trim()) return null;
+  const trimmed = avatarUrl.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  const { data } = supabase.storage.from(PROFILE_PICTURE_BUCKET).getPublicUrl(trimmed);
+  return data?.publicUrl ?? null;
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -153,6 +168,7 @@ export type Database = {
           access_token: string;
           li_at_cookie: string | null;
           person_urn: string;
+          jsessionid: string | null;
           is_active: boolean;
           last_connected_at: string;
           last_tested_at: string | null;
@@ -165,6 +181,7 @@ export type Database = {
           access_token: string;
           li_at_cookie?: string | null;
           person_urn: string;
+          jsessionid?: string | null;
           is_active?: boolean;
           last_connected_at?: string;
           last_tested_at?: string | null;
@@ -177,6 +194,7 @@ export type Database = {
           access_token?: string;
           li_at_cookie?: string | null;
           person_urn?: string;
+          jsessionid?: string | null;
           is_active?: boolean;
           last_connected_at?: string;
           last_tested_at?: string | null;

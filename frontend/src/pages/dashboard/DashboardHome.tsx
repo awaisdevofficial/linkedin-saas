@@ -170,23 +170,24 @@ export default function DashboardHome() {
       {/* Getting Started banner */}
       {!postsLoading && (posts.length === 0 || connectionStatus === 'disconnected') && (
         <div className="glass-card p-6 border border-[#4F6DFF]/30">
-          <h3 className="text-lg font-semibold text-[#F2F5FF] mb-4">Getting Started</h3>
+          <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">Getting started</h3>
+          <p className="text-sm text-[#A7B1D8] mb-4">Complete these steps to start publishing with PostPilot.</p>
           <ul className="space-y-2 text-sm">
             <li className="flex items-center gap-2 text-[#F2F5FF]">
-              <span className="text-[#27C696]">✅</span> Account created
+              <span className="text-[#27C696]" aria-hidden>✅</span> Account created
             </li>
             <li className={`flex items-center gap-2 ${connectionStatus === 'connected' ? 'text-[#F2F5FF]' : 'text-[#A7B1D8]'}`}>
-              <span className={connectionStatus === 'connected' ? 'text-[#27C696]' : 'text-[#A7B1D8]'}>{connectionStatus === 'connected' ? '✅' : '⬜'}</span>
-              LinkedIn connected
+              <span className={connectionStatus === 'connected' ? 'text-[#27C696]' : 'text-[#A7B1D8]'} aria-hidden>{connectionStatus === 'connected' ? '✅' : '⬜'}</span>
+              Connect LinkedIn (add your cookie in Settings)
               {connectionStatus !== 'connected' && (
                 <Link to="/dashboard/settings" className="text-[#4F6DFF] hover:underline ml-1">Connect →</Link>
               )}
             </li>
             <li className={`flex items-center gap-2 ${posts.length > 0 ? 'text-[#F2F5FF]' : 'text-[#A7B1D8]'}`}>
-              <span className={posts.length > 0 ? 'text-[#27C696]' : 'text-[#A7B1D8]'}>{posts.length > 0 ? '✅' : '⬜'}</span>
-              First post generated
+              <span className={posts.length > 0 ? 'text-[#27C696]' : 'text-[#A7B1D8]'} aria-hidden>{posts.length > 0 ? '✅' : '⬜'}</span>
+              First post generated (we create drafts for you automatically)
               {posts.length === 0 && connectionStatus === 'connected' && (
-                <span className="text-[#A7B1D8] ml-1">(Posts are generated automatically every morning)</span>
+                <span className="text-[#A7B1D8] ml-1">— check back in the morning</span>
               )}
             </li>
           </ul>
@@ -202,7 +203,7 @@ export default function DashboardHome() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold text-[#F2F5FF]">Dashboard</h1>
-          <p className="text-[#A7B1D8] mt-1">Welcome back! Here&apos;s what&apos;s happening.</p>
+          <p className="text-[#A7B1D8] mt-1 text-sm">Your posts, schedule, and connection status at a glance.</p>
         </div>
         <Link to="/dashboard/posts/activity">
           <Button className="bg-[#4F6DFF] hover:bg-[#3D5AEB] text-white rounded-xl">
@@ -235,7 +236,7 @@ export default function DashboardHome() {
                 </div>
               </div>
               <div className="flex items-center gap-1 mt-3">
-                <span className="text-sm text-[#A7B1D8]">Live from your posts</span>
+                <span className="text-sm text-[#A7B1D8]">Updates from your posts</span>
               </div>
             </div>
           ))
@@ -247,7 +248,10 @@ export default function DashboardHome() {
         {/* Activity Chart - realtime from posts */}
         <div className="lg:col-span-2 glass-card p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-[#F2F5FF]">Posts by day (realtime)</h3>
+            <div>
+              <h3 className="text-lg font-semibold text-[#F2F5FF]">Posts by day</h3>
+              <p className="text-sm text-[#A7B1D8] mt-0.5">When your posts were created this week</p>
+            </div>
             <Badge variant="outline" className="border-white/10 text-[#A7B1D8]">
               <TrendingUp className="w-3 h-3 mr-1 text-[#27C696]" />
               Live
@@ -283,7 +287,8 @@ export default function DashboardHome() {
 
         {/* LinkedIn Connection Status - from Supabase */}
         <div className="glass-card p-6">
-          <h3 className="text-lg font-semibold text-[#F2F5FF] mb-4">LinkedIn Connection</h3>
+          <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">LinkedIn connection</h3>
+          <p className="text-sm text-[#A7B1D8] mb-4">Your session is used to post and engage on your behalf.</p>
           <div className="flex items-center gap-4 mb-6">
             <div
               className={`w-14 h-14 rounded-xl flex items-center justify-center ${
@@ -342,7 +347,7 @@ export default function DashboardHome() {
                 Loading posts...
               </div>
             ) : recentPosts.length === 0 ? (
-              <p className="text-[#A7B1D8] py-4">No posts yet. Create one from Posts.</p>
+              <p className="text-[#A7B1D8] py-4 text-sm">No posts yet. Head to Posts to create or review drafts.</p>
             ) : (
               recentPosts.map((post) => (
                 <div
@@ -410,9 +415,9 @@ export default function DashboardHome() {
           <div className="space-y-3">
             {upcomingSchedule.length === 0 ? (
               <div className="py-4">
-                <p className="text-[#A7B1D8] mb-3">No upcoming scheduled posts.</p>
+                <p className="text-[#A7B1D8] mb-3 text-sm">No upcoming scheduled posts. Set your preferred days and times in Posts → Settings.</p>
                 <Link to="/dashboard/posts/settings" className="text-[#4F6DFF] hover:underline text-sm font-medium">
-                  Set up your posting schedule →
+                  Set up schedule →
                 </Link>
               </div>
             ) : (

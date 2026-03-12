@@ -20,6 +20,16 @@ type FrequencyId = typeof FREQUENCY_OPTIONS[number]['id'];
 
 const NICHE_LIST = ['tech', 'marketing', 'finance', 'sales', 'hr', 'ai'] as const;
 
+/** Display label for niche (stored value is lowercase) */
+const NICHE_LABELS: Record<string, string> = {
+  tech: 'Tech',
+  marketing: 'Marketing',
+  finance: 'Finance',
+  sales: 'Sales',
+  hr: 'HR',
+  ai: 'AI',
+};
+
 function buildGoogleNewsRssUrl(industry: string): string {
   const t = industry.trim().replace(/\s+/g, '+').replace(/"/g, '');
   if (!t) return '';
@@ -147,17 +157,17 @@ export default function PostsSettings() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
+      <div className="flex items-center justify-center min-h-[200px] w-full">
         <Loader2 className="w-8 h-8 text-[#4F6DFF] animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-semibold text-[#F2F5FF] mb-4">Auto-generate posts</h3>
-        <p className="text-sm text-[#A7B1D8] mb-4">Posts are generated every hour from your niche feed. Choose how often to publish.</p>
+    <div className="space-y-6 w-full min-w-0">
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+        <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">Auto-generate posts</h3>
+        <p className="text-base text-[#A7B1D8] mb-6">Posts are generated every hour from your niche feed. Choose how often to publish.</p>
 
         <div className="space-y-4">
           <div>
@@ -184,16 +194,16 @@ export default function PostsSettings() {
           <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
             <div>
               <span className="text-[#F2F5FF] font-medium">Post at random time</span>
-              <p className="text-sm text-[#A7B1D8] mt-0.5">Pick a random time each day within business hours</p>
+              <p className="text-base text-[#A7B1D8] mt-0.5">Pick a random time each day within business hours.</p>
             </div>
             <Switch checked={postAtRandomTime} onCheckedChange={handlePostAtRandomTimeChange} />
           </div>
         </div>
       </div>
 
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-semibold text-[#F2F5FF] mb-4">Industry (Niche)</h3>
-        <p className="text-sm text-[#A7B1D8] mb-4">Select an industry or add a custom one. A Google News RSS feed is used to generate one post per hour.</p>
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+        <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">Industry (Niche)</h3>
+        <p className="text-base text-[#A7B1D8] mb-6">Select an industry or add a custom one. A Google News RSS feed is used to generate one post per hour.</p>
 
         <div className="space-y-4">
           <div>
@@ -201,12 +211,14 @@ export default function PostsSettings() {
             <select
               value={nicheSelect}
               onChange={(e) => setNicheSelect(e.target.value)}
-              className="w-full max-w-xs px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[#F2F5FF] focus:outline-none focus:ring-2 focus:ring-[#4F6DFF]"
+              className="w-full max-w-xs px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[#F2F5FF] text-base font-normal focus:outline-none focus:ring-2 focus:ring-[#4F6DFF]"
             >
               {NICHE_LIST.map((n) => (
-                <option key={n} value={n} className="bg-[#0f1420]">{n}</option>
+                <option key={n} value={n} className="bg-[#0f1420] text-[#F2F5FF]">
+                  {NICHE_LABELS[n] ?? n.charAt(0).toUpperCase() + n.slice(1)}
+                </option>
               ))}
-              <option value="custom" className="bg-[#0f1420]">Custom industry</option>
+              <option value="custom" className="bg-[#0f1420] text-[#F2F5FF]">Custom industry</option>
             </select>
           </div>
           {nicheSelect === 'custom' && (
@@ -216,9 +228,9 @@ export default function PostsSettings() {
                 value={customIndustry}
                 onChange={(e) => setCustomIndustry(e.target.value)}
                 placeholder="e.g. System Design, Microservices"
-                className="max-w-md bg-white/5 border-white/10 text-[#F2F5FF] rounded-xl"
+                className="max-w-md bg-white/5 border-white/10 text-[#F2F5FF] text-base rounded-xl"
               />
-              <p className="text-xs text-[#A7B1D8] mt-1">A Google News RSS feed will be created for this industry.</p>
+              <p className="text-sm text-[#A7B1D8] mt-1">A Google News RSS feed will be created for this industry.</p>
             </div>
           )}
           <Button onClick={saveNiche} disabled={nicheSaving || (nicheSelect === 'custom' && !customIndustry.trim())} className="bg-[#4F6DFF] hover:bg-[#3D5AEB] text-white rounded-xl">

@@ -163,7 +163,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div ref={mainRef} className="relative bg-[#070A12]">
+    <div ref={mainRef} className="landing-root relative bg-[#070A12]">
       <Navigation />
       
       {/* Section 1: Hero */}

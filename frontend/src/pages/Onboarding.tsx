@@ -121,7 +121,7 @@ export default function Onboarding() {
           {step === 1 && (
             <>
               <h2 className="text-xl font-semibold text-[#F2F5FF]">Connect your LinkedIn</h2>
-              <p className="text-[#A7B1D8] mt-1 mb-6">We need your LinkedIn cookie to post and engage on your behalf.</p>
+              <p className="text-[#A7B1D8] mt-1 mb-6 text-sm">We use your LinkedIn session to post and engage on your behalf. Your cookie is stored securely.</p>
               <div className="space-y-2">
                 <Label className="text-[#F2F5FF]">LinkedIn Cookie (li_at)</Label>
                 <Input
@@ -164,7 +164,7 @@ export default function Onboarding() {
           {step === 2 && (
             <>
               <h2 className="text-xl font-semibold text-[#F2F5FF]">Tell us about yourself</h2>
-              <p className="text-[#A7B1D8] mt-1 mb-6">This helps us generate content that fits your voice.</p>
+              <p className="text-[#A7B1D8] mt-1 mb-6 text-sm">We&apos;ll use this to create posts that match your style and audience.</p>
               <div className="space-y-6">
                 <div>
                   <Label className="text-[#F2F5FF] block mb-2">What&apos;s your niche?</Label>
@@ -240,8 +240,8 @@ export default function Onboarding() {
 
           {step === 3 && (
             <>
-              <h2 className="text-xl font-semibold text-[#F2F5FF]">You&apos;re all set! 🎉</h2>
-              <p className="text-[#A7B1D8] mt-1 mb-6">PostPilot will start generating posts for you automatically.</p>
+              <h2 className="text-xl font-semibold text-[#F2F5FF]">You&apos;re all set</h2>
+              <p className="text-[#A7B1D8] mt-1 mb-6 text-sm">We&apos;ll generate posts for you on your schedule. You can change these anytime in Settings.</p>
               <div className="space-y-3 p-4 rounded-xl bg-white/5 border border-white/10">
                 <p className="flex items-center gap-2 text-[#F2F5FF]"><CheckCircle className="w-5 h-5 text-[#27C696]" /> LinkedIn Connected</p>
                 <p className="flex items-center gap-2 text-[#F2F5FF]"><CheckCircle className="w-5 h-5 text-[#27C696]" /> Niche: {nicheLabel}</p>

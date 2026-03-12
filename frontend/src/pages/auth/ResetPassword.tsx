@@ -66,8 +66,8 @@ export default function ResetPassword() {
               <h1 className="text-2xl font-semibold text-[#F2F5FF] mb-2 text-center">
                 Create new password
               </h1>
-              <p className="text-[#A7B1D8] text-center mb-8">
-                Enter your new password below.
+              <p className="text-[#A7B1D8] text-center mb-8 text-sm">
+                Choose a new password. Use at least 8 characters.
               </p>
 
               {error && (

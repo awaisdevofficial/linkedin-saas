@@ -144,7 +144,7 @@ export default function CommentsSettings() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
+      <div className="flex items-center justify-center min-h-[200px] w-full">
         <Loader2 className="w-8 h-8 text-[#4F6DFF] animate-spin" />
       </div>
     );
@@ -154,16 +154,17 @@ export default function CommentsSettings() {
   const isFast = speedId === 'fast';
 
   return (
-    <div className="space-y-6 max-w-xl">
-      <div className="glass-card p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-[#F2F5FF]">Quick Setup</h3>
+    <div className="space-y-6 w-full min-w-0">
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 space-y-6">
+        <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">Quick setup</h3>
+        <p className="text-base text-[#A7B1D8]">Control how PostPilot engages with your LinkedIn feed—likes, comments, and replies.</p>
 
         <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
           <div className="flex items-center gap-3">
             <Heart className="w-5 h-5 text-[#E11D48]" />
             <div>
               <p className="text-[#F2F5FF] font-medium">Auto-like posts</p>
-              <p className="text-sm text-[#A7B1D8]">Automatically like posts from your LinkedIn feed</p>
+              <p className="text-base text-[#A7B1D8]">Automatically like posts from your LinkedIn feed.</p>
             </div>
           </div>
           <Switch checked={autoLike} onCheckedChange={setAutoLike} />
@@ -174,7 +175,7 @@ export default function CommentsSettings() {
             <MessageSquare className="w-5 h-5 text-[#4F6DFF]" />
             <div>
               <p className="text-[#F2F5FF] font-medium">Auto-comment on posts</p>
-              <p className="text-sm text-[#A7B1D8]">Post AI-generated comments on trending posts in your feed</p>
+              <p className="text-base text-[#A7B1D8]">Post AI-generated comments on trending posts in your feed.</p>
             </div>
           </div>
           <Switch checked={autoComment} onCheckedChange={setAutoComment} />
@@ -185,7 +186,7 @@ export default function CommentsSettings() {
             <MessageSquare className="w-5 h-5 text-[#27C696]" />
             <div>
               <p className="text-[#F2F5FF] font-medium">Auto-reply to comments</p>
-              <p className="text-sm text-[#A7B1D8]">Reply to comments left on your own posts</p>
+              <p className="text-base text-[#A7B1D8]">Reply to comments left on your own posts.</p>
             </div>
           </div>
           <Switch checked={autoReply} onCheckedChange={setAutoReply} />
@@ -212,12 +213,12 @@ export default function CommentsSettings() {
           )}
         </div>
 
-        <Button onClick={handleSave} disabled={saving} className="w-full bg-[#4F6DFF] hover:bg-[#3D5AEB] text-white rounded-xl">
+        <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto bg-[#4F6DFF] hover:bg-[#3D5AEB] text-white rounded-xl">
           {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : saved ? <><CheckCircle className="w-4 h-4 mr-2" /> ✓ Saved</> : 'Save'}
         </Button>
       </div>
 
-      <div className="glass-card p-6">
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
         <button
           type="button"
           onClick={() => setAdvancedOpen(!advancedOpen)}
@@ -282,17 +283,17 @@ export default function CommentsSettings() {
                 }}
                 className="rounded-xl bg-white/5 border border-white/10 text-[#F2F5FF] px-3 py-2 w-24"
               />
-              <p className="text-xs text-[#A7B1D8] mt-1">Override the speed preset. Save above to apply.</p>
+              <p className="text-sm text-[#A7B1D8] mt-1">Override the speed preset. Save above to apply.</p>
             </div>
             <div>
               <Label className="text-[#F2F5FF] block mb-2">Comment tone</Label>
               <select
                 value={commentTone}
                 onChange={(e) => setCommentTone(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[#F2F5FF] focus:outline-none focus:ring-2 focus:ring-[#4F6DFF]"
+                className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[#F2F5FF] text-base font-normal focus:outline-none focus:ring-2 focus:ring-[#4F6DFF]"
               >
                 {TONE_OPTIONS.map((t) => (
-                  <option key={t} value={t.toLowerCase()} className="bg-[#0f1420]">{t}</option>
+                  <option key={t} value={t.toLowerCase()} className="bg-[#0f1420] text-[#F2F5FF]">{t}</option>
                 ))}
               </select>
             </div>

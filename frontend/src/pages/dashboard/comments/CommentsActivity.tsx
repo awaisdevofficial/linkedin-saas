@@ -88,42 +88,64 @@ export default function CommentsActivity() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="glass-card p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <List className="w-5 h-5 text-[#4F6DFF]" />
+    <div className="space-y-6 w-full min-w-0">
+      {/* Full-width header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <List className="w-5 h-5 text-[#4F6DFF] shrink-0" />
           <div>
             <h3 className="text-lg font-semibold text-[#F2F5FF]">Engagement activity</h3>
             <p className="text-sm text-[#A7B1D8]">Likes, comments, and replies from automation</p>
           </div>
         </div>
+      </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as typeof activeTab); setPage(0); }}>
-            <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl">
-              <TabsTrigger value="all" className="capitalize px-4 py-2 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#A7B1D8]">
-                All
-              </TabsTrigger>
-              <TabsTrigger value="like" className="capitalize px-4 py-2 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#A7B1D8]">
-                <Heart className="w-4 h-4 mr-1" /> Likes
-              </TabsTrigger>
-              <TabsTrigger value="comment" className="capitalize px-4 py-2 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#A7B1D8]">
-                <MessageSquare className="w-4 h-4 mr-1" /> Comments
-              </TabsTrigger>
-              <TabsTrigger value="reply" className="capitalize px-4 py-2 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#A7B1D8]">
-                <Reply className="w-4 h-4 mr-1" /> Replies
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value={activeTab} className="mt-4">
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as typeof activeTab); setPage(0); }}>
+        {/* Filters row: type + status in one line */}
+        <div className="flex flex-wrap items-center gap-4">
+          <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl h-auto">
+            <TabsTrigger value="all" className="capitalize px-4 py-2 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#A7B1D8]">
+              All
+            </TabsTrigger>
+            <TabsTrigger value="like" className="capitalize px-4 py-2 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#A7B1D8]">
+              <Heart className="w-4 h-4 mr-1" /> Likes
+            </TabsTrigger>
+            <TabsTrigger value="comment" className="capitalize px-4 py-2 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#A7B1D8]">
+              <MessageSquare className="w-4 h-4 mr-1" /> Comments
+            </TabsTrigger>
+            <TabsTrigger value="reply" className="capitalize px-4 py-2 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#A7B1D8]">
+              <Reply className="w-4 h-4 mr-1" /> Replies
+            </TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+            <span className="text-sm text-[#A7B1D8]">Status:</span>
+            {(['all', 'success', 'failed'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => { setStatusFilter(s); setPage(0); }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  statusFilter === s ? 'bg-[#4F6DFF] text-white' : 'bg-white/5 text-[#A7B1D8] hover:bg-white/10'
+                }`}
+              >
+                {s === 'all' ? 'All' : s === 'success' ? 'Success' : 'Failed'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Full-width table area */}
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden mt-4">
+          <TabsContent value={activeTab} className="mt-0">
             {loading ? (
-              <div className="flex items-center gap-2 text-[#A7B1D8] py-8">
+              <div className="flex items-center gap-2 text-[#A7B1D8] py-12">
                 <Loader2 className="w-6 h-6 animate-spin" />
                 Loading...
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto rounded-xl border border-white/10">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[640px]">
                     <thead>
                       <tr className="border-b border-white/10 bg-white/5">
                         <th className="text-left p-3 text-[#A7B1D8] font-medium">Time</th>
@@ -138,14 +160,14 @@ export default function CommentsActivity() {
                         const Icon = actionIcons[row.action];
                         return (
                           <tr key={row.id} className="border-b border-white/5 hover:bg-white/5">
-                            <td className="p-3 text-[#F2F5FF]">{formatDate(row.created_at)}</td>
+                            <td className="p-3 text-[#F2F5FF] whitespace-nowrap">{formatDate(row.created_at)}</td>
                             <td className="p-3">
                               <Badge variant="outline" className={`capitalize ${actionColors[row.action] || ''}`}>
                                 <Icon className="w-3 h-3 mr-1" /> {row.action}
                               </Badge>
                             </td>
-                            <td className="p-3 text-[#A7B1D8] font-mono text-xs">{truncate(row.post_uri, 40)}</td>
-                            <td className="p-3 text-[#F2F5FF] max-w-[200px] truncate">{row.comment_text || '—'}</td>
+                            <td className="p-3 text-[#A7B1D8] font-mono text-xs max-w-[280px] truncate">{truncate(row.post_uri, 50)}</td>
+                            <td className="p-3 text-[#F2F5FF] max-w-[240px] truncate">{row.comment_text || '—'}</td>
                             <td className="p-3">
                               <Badge variant="outline" className="text-xs capitalize">
                                 {row.status || 'completed'}
@@ -158,7 +180,7 @@ export default function CommentsActivity() {
                   </table>
                 </div>
                 {paginatedLogs.length === 0 && (
-                  <div className="text-center py-8">
+                  <div className="text-center py-12">
                     <p className="text-[#A7B1D8] mb-4">No engagement activity yet. Enable auto-like or auto-comment in Settings to get started.</p>
                     <Link to="/dashboard/comments/settings">
                       <Button className="bg-[#4F6DFF] hover:bg-[#3D5AEB] text-white rounded-xl">Go to Settings →</Button>
@@ -166,7 +188,7 @@ export default function CommentsActivity() {
                   </div>
                 )}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
+                  <div className="flex items-center justify-between p-3 border-t border-white/10 bg-white/[0.02]">
                     <p className="text-sm text-[#A7B1D8]">
                       Page {page + 1} of {totalPages} ({filteredLogs.length} total)
                     </p>
@@ -192,25 +214,9 @@ export default function CommentsActivity() {
                 )}
               </>
             )}
-            </TabsContent>
-          </Tabs>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[#A7B1D8]">Status:</span>
-            {(['all', 'success', 'failed'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => { setStatusFilter(s); setPage(0); }}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  statusFilter === s ? 'bg-[#4F6DFF] text-white' : 'bg-white/5 text-[#A7B1D8] hover:bg-white/10'
-                }`}
-              >
-                {s === 'all' ? 'All' : s === 'success' ? 'Success' : 'Failed'}
-              </button>
-            ))}
-          </div>
+          </TabsContent>
         </div>
-      </div>
+      </Tabs>
     </div>
   );
 }

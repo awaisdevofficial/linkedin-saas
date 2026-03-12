@@ -187,10 +187,10 @@ app.get('/auth/linkedin/callback', async (req, res) => {
       });
     }
 
-    // Store LinkedIn connection (tokens); preserve existing li_at_cookie if user saved it in Settings
+    // Store LinkedIn connection (tokens); preserve existing li_at_cookie and jsessionid if user saved them in Settings
     const { data: existingConn } = await supabaseAdmin
       .from('linkedin_connections')
-      .select('li_at_cookie')
+      .select('li_at_cookie, jsessionid')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -199,6 +199,7 @@ app.get('/auth/linkedin/callback', async (req, res) => {
         user_id: userId,
         access_token: accessToken,
         li_at_cookie: existingConn?.li_at_cookie ?? null,
+        jsessionid: existingConn?.jsessionid ?? null,
         person_urn: sub ? `urn:li:person:${sub}` : `urn:li:person:${userId}`,
         is_active: true,
         last_connected_at: new Date().toISOString(),

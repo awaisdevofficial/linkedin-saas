@@ -1,6 +1,10 @@
 import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 
 const apiKey = process.env.OPENAI_API_KEY;
+const groqClient = process.env.GROQ_API_KEY
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY })
+  : null;
 let client = null;
 if (apiKey?.trim()) {
   client = new OpenAI({ apiKey: apiKey.trim() });
@@ -130,10 +134,10 @@ export async function generatePost(article, userSettings) {
 }
 
 export async function generateComment(postDescription, systemPrompt) {
-  const openai = getClient();
+  if (!groqClient) throw new Error('GROQ_API_KEY not set');
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const completion = await groqClient.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: postDescription?.slice(0, 2000) || 'No context' },
@@ -144,20 +148,21 @@ export async function generateComment(postDescription, systemPrompt) {
     const text = completion.choices?.[0]?.message?.content?.trim() || '';
     return text.replace(/^["']|["']$/g, '').trim();
   } catch (e) {
-    if (isRateLimitError(e)) {
-      await new Promise((r) => setTimeout(r, 60000));
-      return generateComment(postDescription, systemPrompt);
-    }
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generateComment', error: e?.message || String(e) }));
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'groq',
+      action: 'generateComment',
+      error: e?.message || String(e),
+    }));
     throw e;
   }
 }
 
 export async function generateReply(systemPrompt) {
-  const openai = getClient();
+  if (!groqClient) throw new Error('GROQ_API_KEY not set');
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const completion = await groqClient.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: systemPrompt }],
       temperature: 0.6,
       max_tokens: 80,
@@ -165,11 +170,12 @@ export async function generateReply(systemPrompt) {
     const text = completion.choices?.[0]?.message?.content?.trim() || '';
     return text.replace(/^["']|["']$/g, '').trim();
   } catch (e) {
-    if (isRateLimitError(e)) {
-      await new Promise((r) => setTimeout(r, 60000));
-      return generateReply(systemPrompt);
-    }
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generateReply', error: e?.message || String(e) }));
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'groq',
+      action: 'generateReply',
+      error: e?.message || String(e),
+    }));
     throw e;
   }
 }

@@ -109,8 +109,8 @@ export default function CreatePassword() {
               <h1 className="text-2xl font-semibold text-[#F2F5FF] mb-2 text-center">
                 Create your password
               </h1>
-              <p className="text-[#A7B1D8] text-center mb-8">
-                Set a password so you can sign in with your email next time.
+              <p className="text-[#A7B1D8] text-center mb-8 text-sm">
+                Set a password to sign in with email anytime. You can still use LinkedIn to sign in.
               </p>
 
               {error && (
@@ -203,7 +203,7 @@ export default function CreatePassword() {
                 onClick={handleSkip}
                 className="w-full mt-4 text-sm text-[#A7B1D8] hover:text-[#F2F5FF] transition-colors"
               >
-                Skip for now — I&apos;ll use LinkedIn to sign in
+                Skip for now — I&apos;ll sign in with LinkedIn later
               </button>
             </>
           ) : (

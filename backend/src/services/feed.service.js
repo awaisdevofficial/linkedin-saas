@@ -1,38 +1,82 @@
 import axios from 'axios';
 
-const ACTIVITY_REGEX = /urn:li:activity:(\d+)/gi;
-
-export async function fetchLinkedInFeed(liAtCookie) {
+export async function fetchLinkedInFeed(liAtCookie, csrfToken) {
   if (!liAtCookie) return [];
+
   try {
-    const res = await axios.get('https://www.linkedin.com/feed/', {
-      headers: {
-        Cookie: `li_at=${liAtCookie}`,
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-      maxRedirects: 0,
-      validateStatus: () => true,
-    });
-    const html = typeof res.data === 'string' ? res.data : '';
-    const seen = new Set();
+    const res = await axios.get(
+      'https://www.linkedin.com/voyager/api/feed/updatesV2',
+      {
+        params: {
+          count: 20,
+          start: 0,
+          q: 'feed',
+          sortOrder: 'RELEVANCE',
+        },
+        headers: {
+          Cookie: `li_at=${liAtCookie}; JSESSIONID="${csrfToken || 'ajax:0'}"`,
+          'csrf-token': csrfToken || 'ajax:0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'x-li-lang': 'en_US',
+          'x-restli-protocol-version': '2.0.0',
+          'x-li-track': '{"clientVersion":"1.13.0","mpVersion":"1.13.0","osName":"web","timezoneOffset":5,"timezone":"Asia/Karachi","deviceFormFactor":"DESKTOP","mpName":"voyager-web"}',
+          Referer: 'https://www.linkedin.com/feed/',
+          Accept: 'application/vnd.linkedin.normalized+json+2.1',
+        },
+      }
+    );
+
+    const elementUrns = res.data?.data?.['*elements'] || [];
+    const included = res.data?.included || [];
+
     const items = [];
-    let m;
-    ACTIVITY_REGEX.lastIndex = 0;
-    while ((m = ACTIVITY_REGEX.exec(html)) !== null) {
-      const activityId = m[1];
-      if (seen.has(activityId)) continue;
-      seen.add(activityId);
-      const snippet = html.slice(Math.max(0, m.index - 200), m.index + 300).replace(/<[^>]+>/g, ' ');
-      items.push({
-        activity_id: activityId,
-        uri: `urn:li:activity:${activityId}`,
-        description: snippet.replace(/\s+/g, ' ').trim().slice(0, 500),
-      });
+    for (const urn of elementUrns) {
+      try {
+        const el = included.find((i) => i.entityUrn === urn || i.$id === urn);
+        if (!el) continue;
+
+        const activityUrn = el.entityUrn || urn;
+        if (!activityUrn?.includes('activity')) continue;
+
+        const activityMatch = activityUrn.match(/urn:li:activity:(\d+)/);
+        if (!activityMatch) continue;
+
+        const activityId = activityMatch[1];
+        const cleanUrn = `urn:li:activity:${activityId}`;
+
+        const commentary = el.commentary?.text || el.text?.text || '';
+        const authorUrn = el.actor?.['*actor'] || '';
+        const author = included.find((i) => i.entityUrn === authorUrn);
+        const authorName = author?.firstName
+          ? `${author.firstName} ${author.lastName || ''}`.trim()
+          : author?.name || '';
+
+        items.push({
+          activity_id: activityId,
+          uri: cleanUrn,
+          description: `${authorName}: ${commentary}`.trim().slice(0, 500),
+        });
+      } catch (_) {
+        continue;
+      }
     }
+
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'feed',
+      action: 'fetchLinkedInFeed',
+      itemCount: items.length,
+    }));
+
     return items;
   } catch (e) {
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'feed', action: 'fetchLinkedInFeed', error: e.message }));
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'feed',
+      action: 'fetchLinkedInFeed',
+      status: e.response?.status,
+      error: e.response?.data ? JSON.stringify(e.response.data) : e.message,
+    }));
     return [];
   }
 }

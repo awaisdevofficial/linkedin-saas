@@ -24,16 +24,18 @@ export async function runReplyJob() {
           accessToken: user.access_token,
           liAtCookie: user.li_at_cookie,
           personUrn: user.person_urn,
+          csrfToken: user.csrfToken,
         };
 
         for (const post of postedPosts) {
           const postUrn = post.linkedin_post_id;
-          // Skip share URNs — comments API doesn't accept them (needs urn:li:ugcPost:)
-          if (!postUrn || postUrn.includes('urn:li:share:')) continue;
 
           let comments = [];
+          let activityUrn = null;
           try {
-            comments = await linkedin.getPostComments(credentials, postUrn);
+            const result = await linkedin.getPostComments(credentials, postUrn);
+            comments = result.comments || [];
+            activityUrn = result.activityUrn;
           } catch (e) {
             errors.push({ userId, postId: post.id, error: e.message });
             continue;
@@ -41,8 +43,13 @@ export async function runReplyJob() {
 
           const cutoff = Date.now() - CUTOFF_MS;
 
+          if (comments.length > 0) {
+            console.log(JSON.stringify({ action: 'replyJob', postId: post.id, commentCount: comments.length }));
+          }
+
           for (const comment of comments) {
             if (comment.authorUrn === user.person_urn) continue;
+
             const created = comment.createdAt ? new Date(comment.createdAt).getTime() : 0;
             if (created < cutoff) continue;
 
@@ -50,24 +57,30 @@ export async function runReplyJob() {
             if (already) continue;
 
             try {
-              const userSettings = await supabase.getUserContentSettings(userId);
-              const template = await supabase.getPromptTemplate('reply', userSettings.niche || 'all');
-              const builtPrompt = template
-                ? promptService.buildReplyPrompt(userSettings, template.prompt, post.content, comment.text)
-                : `Reply to this comment on my post. Post: ${(post.content || '').slice(0, 200)}. Comment: ${comment.text}. Max 20 words. Return only the reply.`;
+              if (!activityUrn) {
+                errors.push({ userId, commentUrn: comment.commentUrn, error: 'No activityUrn from getPostComments' });
+                continue;
+              }
 
-              const replyText = await openai.generateReply(builtPrompt);
-              const delay = 60000 + Math.random() * 60000;
+              const userSettings = await supabase.getUserContentSettings(userId);
+              const template = await supabase.getPromptTemplate('reply', userSettings?.niche || 'all');
+              const prompt = template
+                ? promptService.buildReplyPrompt(userSettings, template.prompt, post.content, comment.text)
+                : `Reply to this LinkedIn comment on my post in one short, genuine, friendly sentence. No emojis. No hashtags. Comment: "${comment.text}". Return only the reply text.`;
+
+              const replyText = await openai.generateReply(prompt);
+
+              const delay = 60000 + Math.random() * 60000; // 1-2 min production delay
               await new Promise((r) => setTimeout(r, delay));
 
-              await linkedin.replyToComment(credentials, postUrn, comment.commentUrn, replyText);
+              await linkedin.replyToComment(credentials, activityUrn, comment.commentUrn, replyText);
               await supabase.logReply(userId, {
                 post_id: post.id,
                 post_uri: postUrn,
                 comment_urn: comment.commentUrn,
                 comment_text: comment.text,
                 reply_text: replyText,
-                status: 'success',
+                status: 'completed',
               });
               replied++;
             } catch (e) {

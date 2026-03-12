@@ -18,7 +18,7 @@ export async function getAllActiveUsers() {
     const supabase = getClient();
     const { data: conn, error: connErr } = await supabase
       .from('linkedin_connections')
-      .select('user_id, access_token, li_at_cookie, person_urn, is_active')
+      .select('user_id, access_token, li_at_cookie, person_urn, jsessionid, is_active')
       .eq('is_active', true);
     if (connErr) {
       console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getAllActiveUsers', error: connErr.message }));
@@ -30,6 +30,7 @@ export async function getAllActiveUsers() {
       access_token: c.access_token || 'cookie-auth',
       li_at_cookie: c.li_at_cookie || '',
       person_urn: c.person_urn || '',
+      csrfToken: c.jsessionid || undefined,
       is_active: c.is_active,
     }));
   } catch (e) {
@@ -320,7 +321,7 @@ export async function getConnectionByUserId(userId) {
     const supabase = getClient();
     const { data, error } = await supabase
       .from('linkedin_connections')
-      .select('access_token, li_at_cookie, person_urn')
+      .select('access_token, li_at_cookie, person_urn, jsessionid')
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle();
@@ -329,6 +330,7 @@ export async function getConnectionByUserId(userId) {
       accessToken: data.access_token || 'cookie-auth',
       liAtCookie: data.li_at_cookie || '',
       personUrn: data.person_urn || '',
+      csrfToken: data.jsessionid || undefined,
     };
   } catch (e) {
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getConnectionByUserId', userId, error: e.message }));

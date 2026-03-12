@@ -32,7 +32,7 @@ import {
   DialogTrigger,
 } from '../../components/ui/dialog';
 import { useAuth } from '../../lib/auth-context';
-import { supabase } from '../../lib/supabase';
+import { supabase, getAvatarDisplayUrl } from '../../lib/supabase';
 
 function formatRelativeTime(iso: string): string {
   const d = new Date(iso);
@@ -64,12 +64,14 @@ export default function Settings() {
   const [disconnectLoading, setDisconnectLoading] = useState(false);
 
   const [liAtCookie, setLiAtCookie] = useState('');
+  const [jsessionId, setJsessionId] = useState('');
   const [liAtSaving, setLiAtSaving] = useState(false);
   const [liAtSaved, setLiAtSaved] = useState(false);
   const [liAtLoadError, setLiAtLoadError] = useState<string | null>(null);
   const [liAtSaveError, setLiAtSaveError] = useState<string | null>(null);
   const [liAtValidationError, setLiAtValidationError] = useState<string | null>(null);
   const [liAtShowPassword, setLiAtShowPassword] = useState(false);
+  const [jsessionIdShowPassword, setJsessionIdShowPassword] = useState(false);
   const [howToGetCookieOpen, setHowToGetCookieOpen] = useState(false);
 
   function validateAndFormatLiAt(raw: string): { value: string; error: string | null } {
@@ -125,7 +127,7 @@ export default function Settings() {
     const loadLinkedIn = async () => {
       const { data, error } = await supabase
         .from('linkedin_connections')
-        .select('li_at_cookie, last_connected_at')
+        .select('li_at_cookie, jsessionid, last_connected_at')
         .eq('user_id', user.id)
         .maybeSingle();
       if (cancelled) return;
@@ -134,6 +136,7 @@ export default function Settings() {
         setLinkedinConnected(hasConnection);
         setLastConnected(data.last_connected_at ?? null);
         if (data.li_at_cookie) setLiAtCookie(data.li_at_cookie);
+        if (data.jsessionid) setJsessionId(data.jsessionid);
       } else {
         setLinkedinConnected(false);
         setLastConnected(null);
@@ -178,11 +181,13 @@ export default function Settings() {
 
       let error;
 
+      const jsessionidVal = jsessionId.trim() || null;
       if (existing) {
         ({ error } = await supabase
           .from('linkedin_connections')
           .update({
             li_at_cookie: trimmed,
+            jsessionid: jsessionidVal,
             last_connected_at: now,
             is_active: true,
           })
@@ -191,6 +196,7 @@ export default function Settings() {
         ({ error } = await supabase.from('linkedin_connections').insert({
           user_id: user.id,
           li_at_cookie: trimmed,
+          jsessionid: jsessionidVal,
           access_token: 'cookie-auth',
           person_urn: '',
           is_active: true,
@@ -337,35 +343,35 @@ export default function Settings() {
       {/* Page Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-semibold text-[#F2F5FF]">Settings</h1>
-        <p className="text-[#A7B1D8] mt-1">Manage your account and preferences</p>
+        <p className="text-[#A7B1D8] mt-1 text-sm">Manage your account, LinkedIn connection, and preferences.</p>
       </div>
 
       <Tabs defaultValue="profile">
         <TabsList className="bg-[#1E2433] p-1.5 rounded-xl flex flex-wrap h-auto gap-1 w-fit">
           <TabsTrigger
             value="profile"
-            className="px-4 py-2.5 rounded-lg data-[state=active]:bg-[#6366F1] data-[state=active]:text-white text-[#94A3B8] data-[state=inactive]:hover:text-[#F2F5FF] transition-colors"
+            className="px-4 py-2.5 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#94A3B8] data-[state=inactive]:hover:text-[#F2F5FF] transition-colors"
           >
             <User className="w-4 h-4 mr-2 shrink-0" />
             Profile
           </TabsTrigger>
           <TabsTrigger
             value="linkedin"
-            className="px-4 py-2.5 rounded-lg data-[state=active]:bg-[#6366F1] data-[state=active]:text-white text-[#94A3B8] data-[state=inactive]:hover:text-[#F2F5FF] transition-colors"
+            className="px-4 py-2.5 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#94A3B8] data-[state=inactive]:hover:text-[#F2F5FF] transition-colors"
           >
             <Link2 className="w-4 h-4 mr-2 shrink-0" />
             LinkedIn
           </TabsTrigger>
           <TabsTrigger
             value="notifications"
-            className="px-4 py-2.5 rounded-lg data-[state=active]:bg-[#6366F1] data-[state=active]:text-white text-[#94A3B8] data-[state=inactive]:hover:text-[#F2F5FF] transition-colors"
+            className="px-4 py-2.5 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#94A3B8] data-[state=inactive]:hover:text-[#F2F5FF] transition-colors"
           >
             <Bell className="w-4 h-4 mr-2 shrink-0" />
             Notifications
           </TabsTrigger>
           <TabsTrigger
             value="danger"
-            className="px-4 py-2.5 rounded-lg data-[state=active]:bg-[#6366F1] data-[state=active]:text-white text-[#94A3B8] data-[state=inactive]:hover:text-[#F2F5FF] transition-colors"
+            className="px-4 py-2.5 rounded-lg data-[state=active]:bg-[#4F6DFF] data-[state=active]:text-white text-[#94A3B8] data-[state=inactive]:hover:text-[#F2F5FF] transition-colors"
           >
             <AlertTriangle className="w-4 h-4 mr-2 shrink-0" />
             Danger Zone
@@ -375,7 +381,8 @@ export default function Settings() {
         {/* Profile Tab */}
         <TabsContent value="profile" className="mt-6">
           <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold text-[#F2F5FF] mb-6">Profile Information</h3>
+            <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">Profile information</h3>
+            <p className="text-sm text-[#A7B1D8] mb-6">Update your name and avatar. Email is managed by your sign-in provider.</p>
             {profileLoading ? (
               <div className="flex items-center gap-2 text-[#A7B1D8]">
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -385,10 +392,15 @@ export default function Settings() {
               <>
                 {/* Avatar */}
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#4F6DFF] to-[#27C696] flex items-center justify-center">
-                    <span className="text-white font-bold text-2xl">
-                      {profile.name ? profile.name.trim().split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase() : (profile.email?.[0] ?? '?').toUpperCase()}
-                    </span>
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#4F6DFF] to-[#27C696] flex items-center justify-center overflow-hidden shrink-0">
+                    {(() => {
+                      const url = getAvatarDisplayUrl(profile.avatar_url);
+                      return url ? <img src={url} alt="Profile" className="w-full h-full object-cover" /> : (
+                      <span className="text-white font-bold text-2xl">
+                        {profile.name ? profile.name.trim().split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase() : (profile.email?.[0] ?? '?').toUpperCase()}
+                      </span>
+                    );
+                    })()}
                   </div>
                   <div>
                     <Button
@@ -466,7 +478,8 @@ export default function Settings() {
         {/* LinkedIn Tab */}
         <TabsContent value="linkedin" className="mt-6 space-y-6">
           <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold text-[#F2F5FF] mb-4">Connection status</h3>
+            <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">Connection status</h3>
+            <p className="text-sm text-[#A7B1D8] mb-4">Your LinkedIn session is used to post and engage. Connect below to get started.</p>
             <div className="flex items-center gap-4">
               <div
                 className={`w-14 h-14 rounded-xl flex items-center justify-center ${
@@ -495,9 +508,9 @@ export default function Settings() {
           </div>
 
           <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold text-[#F2F5FF] mb-2">LinkedIn Cookie</h3>
+            <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">LinkedIn cookie</h3>
             <p className="text-sm text-[#A7B1D8] mb-4">
-              To post and engage on LinkedIn automatically, we need your session cookie. This is safe — it&apos;s like giving us a temporary key to your account.
+              Paste your <code className="px-1 py-0.5 rounded bg-white/10 text-xs font-mono">li_at</code> cookie so we can post and engage for you. It&apos;s stored securely and only used for your account.
             </p>
 
             <button
@@ -514,13 +527,14 @@ export default function Settings() {
                 <li>Press F12 on your keyboard</li>
                 <li>Click &quot;Application&quot; tab → &quot;Cookies&quot; → &quot;www.linkedin.com&quot;</li>
                 <li>Find the row named &quot;li_at&quot; → click it → copy the value</li>
-                <li>Paste it below</li>
+                <li>Find the row named &quot;JSESSIONID&quot; → copy the value (required for fetching comments)</li>
+                <li>Paste both below</li>
               </ol>
             )}
 
             {liAtLoadError && <p className="text-sm text-[#FF6B6B] mb-3">{liAtLoadError}</p>}
             <div className="space-y-3 max-w-lg">
-              <Label htmlFor="li_at" className="text-[#F2F5FF]">Cookie value</Label>
+              <Label htmlFor="li_at" className="text-[#F2F5FF]">li_at cookie</Label>
               <div className="relative">
                 <Input
                   id="li_at"
@@ -549,6 +563,25 @@ export default function Settings() {
                   aria-label={liAtShowPassword ? 'Hide' : 'Show'}
                 >
                   {liAtShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <Label htmlFor="jsessionid" className="text-[#F2F5FF]">JSESSIONID (for comments)</Label>
+              <div className="relative">
+                <Input
+                  id="jsessionid"
+                  type={jsessionIdShowPassword ? 'text' : 'password'}
+                  placeholder="Paste JSESSIONID from same cookie list (optional but recommended)"
+                  value={jsessionId}
+                  onChange={(e) => setJsessionId(e.target.value)}
+                  className="pr-12 rounded-xl font-mono text-sm bg-white/5 text-[#F2F5FF] placeholder:text-[#A7B1D8]/50 border-white/10 focus:ring-[#4F6DFF]/20 focus:border-[#4F6DFF] focus:ring-2"
+                />
+                <button
+                  type="button"
+                  onClick={() => setJsessionIdShowPassword(!jsessionIdShowPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A7B1D8] hover:text-[#F2F5FF]"
+                  aria-label={jsessionIdShowPassword ? 'Hide' : 'Show'}
+                >
+                  {jsessionIdShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {(liAtValidationError || liAtSaveError) && (
@@ -617,7 +650,8 @@ export default function Settings() {
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="mt-6">
           <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold text-[#F2F5FF] mb-4">Email Notifications</h3>
+            <h3 className="text-lg font-semibold text-[#F2F5FF] mb-1">Email notifications</h3>
+            <p className="text-sm text-[#A7B1D8] mb-4">Choose when you want to receive emails from PostPilot.</p>
             {notificationsLoading ? (
               <div className="flex items-center gap-2 text-[#A7B1D8]">
                 <Loader2 className="w-5 h-5 animate-spin" />

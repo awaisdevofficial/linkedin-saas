@@ -80,13 +80,13 @@ export default function AuthCallback() {
     return (
       <div className="min-h-screen bg-[#070A12] flex flex-col items-center justify-center p-4">
         <div className="glass-card p-8 max-w-md text-center">
-          <p className="text-[#FF6B6B] mb-4">{error}</p>
+          <p className="text-[#FF6B6B] mb-4 text-sm">{error}</p>
           <button
             type="button"
             onClick={() => navigate('/auth/login', { replace: true })}
-            className="text-[#4F6DFF] hover:underline"
+            className="text-[#4F6DFF] hover:underline text-sm"
           >
-            Back to login
+            Back to sign in
           </button>
         </div>
       </div>
@@ -95,8 +95,8 @@ export default function AuthCallback() {
 
   return (
     <div className="min-h-screen bg-[#070A12] flex flex-col items-center justify-center p-4">
-      <Loader2 className="w-10 h-10 text-[#4F6DFF] animate-spin" />
-      <p className="text-[#A7B1D8] mt-4">Completing sign in...</p>
+      <Loader2 className="w-10 h-10 text-[#4F6DFF] animate-spin" aria-hidden />
+      <p className="text-[#A7B1D8] mt-4 text-sm">Completing sign in… Taking you to the dashboard.</p>
     </div>
   );
 }
