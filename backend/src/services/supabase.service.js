@@ -58,6 +58,7 @@ export async function getUserContentSettings(userId) {
         cta_style: 'dm',
         custom_keywords: [],
         topics_to_avoid: [],
+        enable_post_comment: true,
       };
     }
     if (!data) {
@@ -78,9 +79,10 @@ export async function getUserContentSettings(userId) {
         custom_reply_prompt: null,
         custom_cta: null,
         generation_paused: false,
+        enable_post_comment: true,
       };
     }
-    return { ...data, generation_paused: data.generation_paused === true };
+    return { ...data, generation_paused: data.generation_paused === true, enable_post_comment: data.enable_post_comment !== false };
   } catch (e) {
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getUserContentSettings', userId, error: e.message }));
     return {
@@ -100,6 +102,7 @@ export async function getUserContentSettings(userId) {
       custom_reply_prompt: null,
       custom_cta: null,
       generation_paused: false,
+      enable_post_comment: true,
     };
   }
 }
@@ -214,7 +217,12 @@ export async function getEngagementSettings(userId) {
       .eq('user_id', userId)
       .maybeSingle();
     if (error || !data) return null;
-    return data;
+    return {
+      ...data,
+      auto_liking: data.auto_liking !== false,
+      auto_commenting: data.auto_commenting !== false,
+      auto_replying: data.auto_replying !== false,
+    };
   } catch (e) {
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getEngagementSettings', userId, error: e.message }));
     return null;

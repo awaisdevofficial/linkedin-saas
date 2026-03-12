@@ -652,7 +652,9 @@ app.post('/api/publish-now', async (req, res) => {
       linkedin_post_id: postUrn,
       updated_at: new Date().toISOString(),
     });
-    const suggestedComments = post.suggested_comments || [];
+    const contentSettings = await supabaseService.getUserContentSettings(user.id);
+    const enablePostComment = contentSettings?.enable_post_comment !== false;
+    const suggestedComments = (enablePostComment && (post.suggested_comments || [])) || [];
     if (suggestedComments.length > 0) {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       (async () => {

@@ -26,8 +26,9 @@ const AutomationSettings = () => {
     custom_post_prompt?: string;
     custom_comment_prompt?: string;
     custom_reply_prompt?: string;
+    enable_post_comment?: boolean;
   } | null>(null);
-  const [engageSettings, setEngageSettings] = useState<Record<string, unknown> | null>(null);
+  const [engageSettings, setEngageSettings] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -49,7 +50,7 @@ const AutomationSettings = () => {
           .maybeSingle(),
       ]);
       setContentSettings(settingsRes.data as typeof contentSettings);
-      setEngageSettings(engageRes.data as Record<string, unknown>);
+      setEngageSettings((engageRes.data as Record<string, unknown>) ?? {});
       setLoading(false);
     };
     fetch();
@@ -95,7 +96,7 @@ const AutomationSettings = () => {
   };
 
   const handleSaveEngage = async () => {
-    if (!supabase || !user || !engageSettings) return;
+    if (!supabase || !user) return;
     setSaving('engage');
     const client = supabase;
     try {
@@ -152,6 +153,17 @@ const AutomationSettings = () => {
               disabled={!!saving}
             />
             <Label className="text-sm">Auto-generation</Label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={contentSettings?.enable_post_comment !== false}
+              onCheckedChange={(checked) =>
+                setContentSettings((s) => ({ ...(s || {}), enable_post_comment: checked }))
+              }
+              disabled={!!saving}
+            />
+            <Label className="text-sm">When publishing: Post suggested comments on my post</Label>
           </div>
 
           <Separator />
@@ -232,12 +244,32 @@ const AutomationSettings = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={engageSettings?.auto_liking !== false}
+              onCheckedChange={(checked) =>
+                setEngageSettings((s) => ({ ...s, auto_liking: checked }))
+              }
+              disabled={!!saving}
+            />
+            <Label className="text-sm">Enable auto-like on feed posts</Label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={engageSettings?.auto_commenting !== false}
+              onCheckedChange={(checked) =>
+                setEngageSettings((s) => ({ ...s, auto_commenting: checked }))
+              }
+              disabled={!!saving}
+            />
+            <Label className="text-sm">Enable comment on feed posts</Label>
+          </div>
           <div className="space-y-2">
             <Label>Comment Prompt</Label>
             <Textarea
               value={(engageSettings?.comment_prompt as string) || ''}
               onChange={(e) =>
-                setEngageSettings((s) => ({ ...(s || {}), comment_prompt: e.target.value }))
+                setEngageSettings((s) => ({ ...s, comment_prompt: e.target.value }))
               }
               rows={3}
               placeholder="Write a short genuine LinkedIn comment..."
@@ -268,6 +300,16 @@ const AutomationSettings = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={engageSettings?.auto_replying !== false}
+              onCheckedChange={(checked) =>
+                setEngageSettings((s) => ({ ...s, auto_replying: checked }))
+              }
+              disabled={!!saving}
+            />
+            <Label className="text-sm">Enable auto-reply to comments on my posts</Label>
+          </div>
           <div className="space-y-2">
             <Label>Reply Prompt</Label>
             <Textarea
@@ -282,7 +324,10 @@ const AutomationSettings = () => {
 
           <Button
             className="bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-            onClick={handleSaveContent}
+            onClick={async () => {
+              await handleSaveContent();
+              await handleSaveEngage();
+            }}
             disabled={!!saving}
           >
             <Save className="w-4 h-4 mr-2" />
