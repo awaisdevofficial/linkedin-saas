@@ -188,14 +188,24 @@ const PostsActivity = () => {
     }
   };
 
-  const handleRegenerate = async (postId: string) => {
+  const handleRegenerateImage = async (postId: string) => {
     if (!accessToken) return;
     setActionLoading(postId);
     try {
-      await apiCalls.regeneratePost(accessToken, postId);
-      toast.success('Post regenerated');
+      const res = await apiCalls.regenerateImage(accessToken, postId);
+      if (res.media_url) {
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? { ...p, media_url: res.media_url! } : p))
+        );
+        if (viewPost?.id === postId) {
+          setViewPost((prev) => (prev ? { ...prev, media_url: res.media_url! } : null));
+        }
+        toast.success('Picture regenerated');
+      } else {
+        toast.success('Regeneration started');
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Regenerate failed');
+      toast.error(err instanceof Error ? err.message : 'Regenerate picture failed');
     } finally {
       setActionLoading(null);
     }
@@ -510,21 +520,6 @@ const PostsActivity = () => {
                     </Button>
                   </>
                 )}
-                {!post.posted && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-full"
-                    onClick={() => handleRegenerate(post.id)}
-                    disabled={!!actionLoading}
-                  >
-                    {actionLoading === post.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4" />
-                    )}
-                  </Button>
-                )}
                 {!post.media_url && !post.posted && (
                   <Button
                     size="sm"
@@ -801,7 +796,7 @@ const PostsActivity = () => {
                 </div>
 
                 {/* PostPilot actions footer */}
-                <div className="mt-4 flex justify-end gap-3">
+                <div className="mt-4 flex justify-end gap-3 flex-wrap">
                   <Button
                     variant="outline"
                     onClick={() => setIsViewDialogOpen(false)}
@@ -810,17 +805,32 @@ const PostsActivity = () => {
                     Close
                   </Button>
                   {!viewPost.posted && (
-                    <Button
-                      className="bg-[#0A66C2] hover:bg-[#004182] rounded-full"
-                      onClick={() => {
-                        setIsViewDialogOpen(false);
-                        setSelectedPost({ ...viewPost });
-                        setIsEditDialogOpen(true);
-                      }}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                        onClick={() => handleRegenerateImage(viewPost.id)}
+                        disabled={!!actionLoading}
+                      >
+                        {actionLoading === viewPost.id ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                        )}
+                        Regenerate picture
+                      </Button>
+                      <Button
+                        className="bg-[#0A66C2] hover:bg-[#004182] rounded-full"
+                        onClick={() => {
+                          setIsViewDialogOpen(false);
+                          setSelectedPost({ ...viewPost });
+                          setIsEditDialogOpen(true);
+                        }}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>

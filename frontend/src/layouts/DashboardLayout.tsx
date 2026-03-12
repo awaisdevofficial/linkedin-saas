@@ -41,20 +41,53 @@ const DashboardLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLinkedInConnected, setIsLinkedInConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'ok' | 'missing' | 'needsCookies' | 'expired'>('missing');
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null);
 
   useEffect(() => {
     if (!supabase || !user) return;
     const client = supabase;
+
+    const evaluateStatus = (row: {
+      li_at_cookie?: string | null;
+      jsessionid?: string | null;
+      cookie_status?: string | null;
+      is_active?: boolean | null;
+    } | null) => {
+      if (!row || row.is_active === false) {
+        setIsLinkedInConnected(false);
+        setConnectionStatus('missing');
+        return;
+      }
+      const hasLiAt = !!row.li_at_cookie;
+      const hasJsession = !!row.jsessionid;
+      const statusRaw = (row.cookie_status || '').toLowerCase();
+
+      if (statusRaw === 'expired') {
+        setIsLinkedInConnected(false);
+        setConnectionStatus('expired');
+        return;
+      }
+
+      if (!hasLiAt || !hasJsession) {
+        setIsLinkedInConnected(false);
+        setConnectionStatus('needsCookies');
+        return;
+      }
+
+      setIsLinkedInConnected(true);
+      setConnectionStatus('ok');
+    };
+
     const fetchConnection = async () => {
       const { data } = await client
         .from('linkedin_connections')
-        .select('id')
+        .select('li_at_cookie, jsessionid, cookie_status, is_active')
         .eq('user_id', user.id)
-        .eq('is_active', true)
         .maybeSingle();
-      setIsLinkedInConnected(!!data);
+      evaluateStatus(data as any);
     };
+
     const fetchProfile = async () => {
       const { data } = await client
         .from('profiles')
@@ -63,8 +96,17 @@ const DashboardLayout = () => {
         .maybeSingle();
       setProfile(data);
     };
+
     fetchConnection();
     fetchProfile();
+
+    const handler = () => {
+      fetchConnection();
+    };
+    window.addEventListener('linkedin-connection-updated', handler);
+    return () => {
+      window.removeEventListener('linkedin-connection-updated', handler);
+    };
   }, [user]);
 
   const handleLogout = async () => {
@@ -188,17 +230,22 @@ const DashboardLayout = () => {
           </div>
         </header>
 
-        {!isLinkedInConnected && (
+        {connectionStatus !== 'ok' && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <p className="text-sm text-amber-800">
-                Connect LinkedIn to get started: add your li_at cookie in Settings or use OAuth
+                {connectionStatus === 'missing' &&
+                  'Connect LinkedIn to start automation: add your li_at and JSESSIONID cookies in Settings or use the LinkedIn OAuth button.'}
+                {connectionStatus === 'needsCookies' &&
+                  'Your LinkedIn connection is incomplete. Add both li_at and JSESSIONID cookies in Settings so publishing and engagement work reliably.'}
+                {connectionStatus === 'expired' &&
+                  'Your LinkedIn session cookie has expired. Paste a fresh li_at and JSESSIONID in Settings to resume posting and engagement.'}
               </p>
               <Link
-                to="/dashboard/settings"
-                className="text-sm text-amber-800 font-medium hover:underline"
+                to="/dashboard/settings?tab=linkedin"
+                className="shrink-0 text-sm text-amber-800 font-medium hover:underline"
               >
-                Connect in Settings →
+                Fix in Settings →
               </Link>
             </div>
           </div>

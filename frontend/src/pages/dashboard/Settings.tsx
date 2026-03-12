@@ -112,6 +112,7 @@ const Settings = () => {
       );
       setIsLinkedInConnected(!!(linkedIn.liAt.trim() || linkedIn.jsessionId.trim()));
       toast.success('LinkedIn credentials saved');
+      window.dispatchEvent(new Event('linkedin-connection-updated'));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed');
     } finally {
@@ -130,6 +131,7 @@ const Settings = () => {
       setLinkedIn({ liAt: '', jsessionId: '' });
       setDisconnectDialogOpen(false);
       toast.success('LinkedIn disconnected');
+      window.dispatchEvent(new Event('linkedin-connection-updated'));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed');
     }
