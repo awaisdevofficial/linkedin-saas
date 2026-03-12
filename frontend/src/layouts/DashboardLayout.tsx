@@ -40,7 +40,6 @@ const DashboardLayout = () => {
   const { user, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLinkedInConnected, setIsLinkedInConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'ok' | 'missing' | 'needsCookies' | 'expired'>('missing');
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null);
 
@@ -48,14 +47,15 @@ const DashboardLayout = () => {
     if (!supabase || !user) return;
     const client = supabase;
 
-    const evaluateStatus = (row: {
+    type ConnectionRow = {
       li_at_cookie?: string | null;
       jsessionid?: string | null;
       cookie_status?: string | null;
       is_active?: boolean | null;
-    } | null) => {
+    } | null;
+
+    const evaluateStatus = (row: ConnectionRow) => {
       if (!row || row.is_active === false) {
-        setIsLinkedInConnected(false);
         setConnectionStatus('missing');
         return;
       }
@@ -64,18 +64,15 @@ const DashboardLayout = () => {
       const statusRaw = (row.cookie_status || '').toLowerCase();
 
       if (statusRaw === 'expired') {
-        setIsLinkedInConnected(false);
         setConnectionStatus('expired');
         return;
       }
 
       if (!hasLiAt || !hasJsession) {
-        setIsLinkedInConnected(false);
         setConnectionStatus('needsCookies');
         return;
       }
 
-      setIsLinkedInConnected(true);
       setConnectionStatus('ok');
     };
 
@@ -85,7 +82,7 @@ const DashboardLayout = () => {
         .select('li_at_cookie, jsessionid, cookie_status, is_active')
         .eq('user_id', user.id)
         .maybeSingle();
-      evaluateStatus(data as any);
+      evaluateStatus(data as ConnectionRow);
     };
 
     const fetchProfile = async () => {
