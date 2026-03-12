@@ -19,15 +19,21 @@ const AuthCallback = () => {
       }
 
       try {
-        // If this is a magic-link redirect, extract the session from the URL hash.
-        // Supabase JS v2 typings may not expose getSessionFromUrl, so access via any.
-        if (window.location.hash.includes('access_token=')) {
-          const { error: urlError } = await (supabase.auth as any).getSessionFromUrl?.({
-            storeSession: true,
-          });
-          if (urlError) {
-            setError(urlError.message);
-            return;
+        const hash = window.location.hash?.slice(1) || '';
+        if (hash.includes('access_token=')) {
+          const params = new URLSearchParams(hash);
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          if (access_token && refresh_token) {
+            const { error: setErr } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
+            if (setErr) {
+              setError(setErr.message);
+              return;
+            }
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
           }
         }
 
@@ -47,8 +53,9 @@ const AuthCallback = () => {
             navigate('/auth/login', { replace: true });
           }
         }
-      } catch (e: any) {
-        setError(e?.message || 'Unexpected error during sign-in callback.');
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Unexpected error during sign-in callback.';
+        setError(msg);
       }
     };
 
