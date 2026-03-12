@@ -26,11 +26,23 @@ function createWatermarkSvg() {
   `);
 }
 
-export async function processAndUploadImage(userId, dalleUrl) {
+/**
+ * Process and upload an image. urlOrBuffer can be:
+ * - string: URL to download (e.g. DALL-E)
+ * - Buffer: raw image bytes (e.g. from Gemini)
+ */
+export async function processAndUploadImage(userId, urlOrBuffer) {
   try {
-    // 1. Download DALL-E image
-    const response = await axios.get(dalleUrl, { responseType: 'arraybuffer', timeout: 30000 });
-    let imageBuffer = Buffer.from(response.data);
+    let imageBuffer;
+    if (Buffer.isBuffer(urlOrBuffer)) {
+      imageBuffer = urlOrBuffer;
+    } else if (typeof urlOrBuffer === 'string' && urlOrBuffer.startsWith('data:')) {
+      const base64 = urlOrBuffer.replace(/^data:image\/\w+;base64,/, '');
+      imageBuffer = Buffer.from(base64, 'base64');
+    } else {
+      const response = await axios.get(urlOrBuffer, { responseType: 'arraybuffer', timeout: 30000 });
+      imageBuffer = Buffer.from(response.data);
+    }
 
     // 2. Resize to 1200x627 then composite watermark bottom-right
     const watermark = createWatermarkSvg();

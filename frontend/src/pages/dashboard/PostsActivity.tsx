@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -76,6 +76,7 @@ const PostsActivity = () => {
   const [viewPost, setViewPost] = useState<Post | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [generationPaused, setGenerationPaused] = useState(false);
+  const generationPausedFetched = useRef(false);
   const [profile, setProfile] = useState<{ avatar_url?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -106,7 +107,8 @@ const PostsActivity = () => {
     };
     fetchPosts();
 
-    if (accessToken) {
+    if (accessToken && !generationPausedFetched.current) {
+      generationPausedFetched.current = true;
       apiCalls.getGenerationPaused(accessToken).then((r) => setGenerationPaused(r.generation_paused)).catch(() => {});
     }
 

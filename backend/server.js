@@ -481,6 +481,16 @@ app.post('/api/regenerate-image', async (req, res) => {
 
 // POST /api/generate-image-for-post — generate image for a post (creates visual_prompt from text if missing)
 app.post('/api/generate-image-for-post', async (req, res) => {
+  // Skip if no image provider configured (OpenAI or Gemini)
+  const hasOpenAI = !!process.env.OPENAI_API_KEY?.trim();
+  const hasGemini = !!process.env.GEMINI_API_KEY?.trim();
+  if (!hasOpenAI && !hasGemini) {
+    return res.status(503).json({
+      error: 'Image generation not available',
+      reason: 'no_image_url',
+      message: 'Set OPENAI_API_KEY or GEMINI_API_KEY on the server to enable image generation.',
+    });
+  }
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });

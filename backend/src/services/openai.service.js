@@ -1,8 +1,9 @@
 /**
- * AI usage: images (DALL-E, visual prompts) = OpenAI only. Content, comments, replies = Groq only.
+ * AI usage: images = Gemini (preferred) or OpenAI DALL-E. Content, comments, replies = Groq only.
  */
 import OpenAI from 'openai';
 import Groq from 'groq-sdk';
+import axios from 'axios';
 
 const apiKey = process.env.OPENAI_API_KEY;
 const groqClient = process.env.GROQ_API_KEY
@@ -227,32 +228,78 @@ export async function generateVisualPromptFromPost(hook, content) {
   return JSON.parse(raw);
 }
 
-/** Images: OpenAI only (DALL-E). */
+const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+/** Build text prompt from visual_prompt object for image generation. */
+function buildImagePrompt(visualPrompt) {
+  const v = visualPrompt;
+  return `${v.visual_concept || 'Professional graphic'}. 
+Style: ${v.design_style || 'minimal, clean, professional'}. 
+Text overlay: "${v.headline_text || ''}".
+Professional LinkedIn post image. Dark background. Clean typography. No people. No faces. Minimalist.`;
+}
+
+/** Generate image via Gemini API; returns Buffer or null. */
+async function generateImageWithGemini(visualPrompt) {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) return null;
+  const prompt = buildImagePrompt(visualPrompt);
+  const url = `${GEMINI_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent`;
+  const res = await axios.post(
+    url,
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseModalities: ['IMAGE', 'TEXT'],
+      },
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      timeout: 60000,
+      responseType: 'json',
+    }
+  );
+  const parts = res.data?.candidates?.[0]?.content?.parts ?? [];
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      return Buffer.from(part.inlineData.data, 'base64');
+    }
+  }
+  return null;
+}
+
+/** Images: Gemini (preferred when GEMINI_API_KEY set) or OpenAI DALL-E. Returns URL (string) or Buffer. */
 export async function generateImage(visualPrompt) {
   try {
     if (!visualPrompt || typeof visualPrompt !== 'object') {
       return null;
     }
-    const openai = getClient(); // requires OPENAI_API_KEY
-    const v = visualPrompt;
-    const prompt = `${v.visual_concept || 'Professional graphic'}. 
-Style: ${v.design_style || 'minimal, clean, professional'}. 
-Text overlay: "${v.headline_text || ''}".
-Professional LinkedIn post image. Dark background. Clean typography. No people. No faces. Minimalist.`;
-
-    const response = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt,
-      size: '1792x1024',
-      quality: 'standard',
-      n: 1,
-    });
-
-    return response.data?.[0]?.url ?? null;
+    if (process.env.GEMINI_API_KEY?.trim()) {
+      const buffer = await generateImageWithGemini(visualPrompt);
+      if (buffer) return buffer;
+    }
+    if (process.env.OPENAI_API_KEY?.trim()) {
+      const openai = getClient();
+      const prompt = buildImagePrompt(visualPrompt);
+      const response = await openai.images.generate({
+        model: 'dall-e-3',
+        prompt,
+        size: '1792x1024',
+        quality: 'standard',
+        n: 1,
+      });
+      const url = response.data?.[0]?.url ?? null;
+      if (url) return url;
+    }
+    return null;
   } catch (e) {
     console.error(JSON.stringify({
       timestamp: new Date().toISOString(),
-      service: 'openai',
+      service: process.env.GEMINI_API_KEY ? 'gemini' : 'openai',
       action: 'generateImage',
       error: e.message
     }));
