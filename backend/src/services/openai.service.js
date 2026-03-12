@@ -16,6 +16,13 @@ function isRateLimitError(e) {
   return status === 429;
 }
 
+/** True if the error is auth (401) or invalid key. */
+function isAuthError(e) {
+  const status = e?.status ?? e?.statusCode ?? e?.response?.status;
+  const msg = (e?.message || '').toLowerCase();
+  return status === 401 || msg.includes('incorrect api key') || msg.includes('invalid api key') || msg.includes('authentication');
+}
+
 function getClient() {
   if (!client) throw new Error('OpenAI client not initialized: set OPENAI_API_KEY');
   return client;
@@ -71,11 +78,37 @@ ${userSettings.custom_keywords?.length ? 'Include these topics naturally: ' + us
 ${userSettings.topics_to_avoid?.length ? 'Do NOT mention: ' + userSettings.topics_to_avoid.join(', ') : ''}`;
 }
 
+function parsePostResult(parsed) {
+  const hook = parsed.headline_hook ?? parsed.hook ?? '';
+  const content = parsed.post_copy ?? parsed.content ?? '';
+  const hashtags = Array.isArray(parsed.hashtags) ? parsed.hashtags : [];
+  const visual_prompt = parsed.visual_prompt || null;
+  const suggested_comments = Array.isArray(parsed.suggested_comments) ? parsed.suggested_comments : [];
+  return { headline_hook: hook, post_copy: content, hashtags, visual_prompt, suggested_comments };
+}
+
+async function attemptGroqPost(userContent) {
+  if (!groqClient) return null;
+  const completion = await groqClient.chat.completions.create({
+    model: 'llama-3.1-70b-versatile',
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userContent },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.7,
+    max_tokens: 2048,
+  });
+  const text = completion.choices?.[0]?.message?.content?.trim() || '{}';
+  const cleaned = text.replace(/^```json\s*|\s*```$/g, '').trim();
+  return JSON.parse(cleaned);
+}
+
 export async function generatePost(article, userSettings) {
-  const openai = getClient();
   const userContent = buildUserMessage(article, userSettings || {});
 
-  async function attempt() {
+  async function attemptOpenAI() {
+    const openai = getClient();
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -90,24 +123,21 @@ export async function generatePost(article, userSettings) {
   }
 
   try {
-    let parsed = await attempt();
-    const hook = parsed.headline_hook ?? parsed.hook ?? '';
-    const content = parsed.post_copy ?? parsed.content ?? '';
-    const hashtags = Array.isArray(parsed.hashtags) ? parsed.hashtags : [];
-    const visual_prompt = parsed.visual_prompt || null;
-    const suggested_comments = Array.isArray(parsed.suggested_comments) ? parsed.suggested_comments : [];
-    return { headline_hook: hook, post_copy: content, hashtags, visual_prompt, suggested_comments };
+    let parsed = client ? await attemptOpenAI() : null;
+    if (!parsed && groqClient) {
+      parsed = await attemptGroqPost(userContent);
+    }
+    if (!parsed) {
+      throw new Error('OpenAI client not initialized: set OPENAI_API_KEY or GROQ_API_KEY');
+    }
+    return parsePostResult(parsed);
   } catch (e) {
     if (e instanceof SyntaxError) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
-        const retry = await attempt();
-        const hook = retry.headline_hook ?? retry.hook ?? '';
-        const content = retry.post_copy ?? retry.content ?? '';
-        const hashtags = Array.isArray(retry.hashtags) ? retry.hashtags : [];
-        const visual_prompt = retry.visual_prompt || null;
-        const suggested_comments = Array.isArray(retry.suggested_comments) ? retry.suggested_comments : [];
-        return { headline_hook: hook, post_copy: content, hashtags, visual_prompt, suggested_comments };
+        const retry = client ? await attemptOpenAI() : await attemptGroqPost(userContent);
+        if (retry) return parsePostResult(retry);
+        throw e;
       } catch (e2) {
         console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generatePost', error: e2?.message || String(e2) }));
         throw e2;
@@ -116,16 +146,21 @@ export async function generatePost(article, userSettings) {
     if (isRateLimitError(e)) {
       await new Promise((r) => setTimeout(r, 60000));
       try {
-        const retry = await attempt();
-        const hook = retry.headline_hook ?? retry.hook ?? '';
-        const content = retry.post_copy ?? retry.content ?? '';
-        const hashtags = Array.isArray(retry.hashtags) ? retry.hashtags : [];
-        const visual_prompt = retry.visual_prompt || null;
-        const suggested_comments = Array.isArray(retry.suggested_comments) ? retry.suggested_comments : [];
-        return { headline_hook: hook, post_copy: content, hashtags, visual_prompt, suggested_comments };
+        const retry = client ? await attemptOpenAI() : await attemptGroqPost(userContent);
+        if (retry) return parsePostResult(retry);
+        throw e;
       } catch (e2) {
         console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generatePost', error: e2?.message || String(e2) }));
         throw e2;
+      }
+    }
+    if (isAuthError(e) && groqClient) {
+      try {
+        const parsed = await attemptGroqPost(userContent);
+        if (parsed) return parsePostResult(parsed);
+      } catch (groqErr) {
+        console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generatePost', error: e?.message ?? String(e) }));
+        throw e;
       }
     }
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generatePost', error: e?.message ?? String(e) }));
