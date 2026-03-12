@@ -44,7 +44,9 @@ const AuthCallback = () => {
         }
 
         if (session) {
-          navigate('/dashboard', { replace: true });
+          // Full page redirect so the app loads with session in storage (avoids auth-context race)
+          window.location.replace('/dashboard');
+          return;
         } else {
           const params = new URLSearchParams(window.location.search);
           if (params.get('fallback') === '1') {
