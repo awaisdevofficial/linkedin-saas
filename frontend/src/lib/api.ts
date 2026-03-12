@@ -36,7 +36,7 @@ export async function api<T = unknown>(
 
 export const apiCalls = {
   generate: (token: string) =>
-    api<{ success: boolean }>('/api/generate', { token, method: 'POST', body: {} }),
+    api<{ success: boolean }>('/api/generate', { token, method: 'POST', body: { force: true } }),
 
   getGenerationPaused: (token: string) =>
     api<{ generation_paused: boolean }>('/api/settings/generation-paused', { token }),

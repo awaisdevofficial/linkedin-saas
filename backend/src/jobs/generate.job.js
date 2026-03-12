@@ -6,13 +6,14 @@ import { logger } from '../utils/logger.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function runGenerateJob(optionUserId = null) {
+export async function runGenerateJob(optionUserId = null, options = {}) {
+  const { force: forceGenerate = false } = options;
   const ts = new Date().toISOString();
   let usersProcessed = 0;
   let postsCreated = 0;
   const errors = [];
 
-  logger.automation('generate_job_start', { optionUserId, timestamp: ts });
+  logger.automation('generate_job_start', { optionUserId, timestamp: ts, force: forceGenerate });
 
   try {
     let users = await supabase.getAllActiveUsers();
@@ -27,7 +28,7 @@ export async function runGenerateJob(optionUserId = null) {
     for (const user of users) {
       try {
         const settings = await supabase.getUserContentSettings(user.user_id);
-        if (settings.generation_paused) {
+        if (settings.generation_paused && !forceGenerate) {
           logger.automation('generate_job_user_skipped', { userId: user.user_id, reason: 'generation_paused' });
           continue;
         }

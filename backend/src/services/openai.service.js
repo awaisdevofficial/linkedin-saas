@@ -1,3 +1,6 @@
+/**
+ * AI usage: images (DALL-E, visual prompts) = OpenAI only. Content, comments, replies = Groq only.
+ */
 import OpenAI from 'openai';
 import Groq from 'groq-sdk';
 
@@ -16,15 +19,8 @@ function isRateLimitError(e) {
   return status === 429;
 }
 
-/** True if the error is auth (401) or invalid key. */
-function isAuthError(e) {
-  const status = e?.status ?? e?.statusCode ?? e?.response?.status;
-  const msg = (e?.message || '').toLowerCase();
-  return status === 401 || msg.includes('incorrect api key') || msg.includes('invalid api key') || msg.includes('authentication');
-}
-
 function getClient() {
-  if (!client) throw new Error('OpenAI client not initialized: set OPENAI_API_KEY');
+  if (!client) throw new Error('OpenAI client not initialized: set OPENAI_API_KEY for image generation');
   return client;
 }
 
@@ -89,81 +85,65 @@ function parsePostResult(parsed) {
 
 async function attemptGroqPost(userContent) {
   if (!groqClient) return null;
-  const completion = await groqClient.chat.completions.create({
-    model: 'llama-3.1-70b-versatile',
+  const baseParams = {
+    model: 'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userContent },
     ],
-    response_format: { type: 'json_object' },
     temperature: 0.7,
     max_tokens: 2048,
-  });
-  const text = completion.choices?.[0]?.message?.content?.trim() || '{}';
-  const cleaned = text.replace(/^```json\s*|\s*```$/g, '').trim();
-  return JSON.parse(cleaned);
-}
-
-export async function generatePost(article, userSettings) {
-  const userContent = buildUserMessage(article, userSettings || {});
-
-  async function attemptOpenAI() {
-    const openai = getClient();
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userContent },
-      ],
+  };
+  try {
+    const completion = await groqClient.chat.completions.create({
+      ...baseParams,
       response_format: { type: 'json_object' },
-      temperature: 0.7,
     });
     const text = completion.choices?.[0]?.message?.content?.trim() || '{}';
-    return JSON.parse(text);
+    const cleaned = text.replace(/^```json\s*|\s*```$/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch (err) {
+    const msg = (err?.message || '').toLowerCase();
+    if (msg.includes('response_format') || msg.includes('400') || msg.includes('invalid')) {
+      const completion = await groqClient.chat.completions.create(baseParams);
+      const text = completion.choices?.[0]?.message?.content?.trim() || '{}';
+      const cleaned = text.replace(/^```json\s*|\s*```$/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      return parsed;
+    }
+    throw err;
   }
+}
+
+/** Content generation (posts): Groq only. */
+export async function generatePost(article, userSettings) {
+  if (!groqClient) throw new Error('GROQ_API_KEY required for content generation');
+  const userContent = buildUserMessage(article, userSettings || {});
 
   try {
-    let parsed = client ? await attemptOpenAI() : null;
-    if (!parsed && groqClient) {
-      parsed = await attemptGroqPost(userContent);
-    }
-    if (!parsed) {
-      throw new Error('OpenAI client not initialized: set OPENAI_API_KEY or GROQ_API_KEY');
-    }
+    let parsed = await attemptGroqPost(userContent);
+    if (!parsed) throw new Error('Groq post generation returned no result');
     return parsePostResult(parsed);
   } catch (e) {
     if (e instanceof SyntaxError) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
-        const retry = client ? await attemptOpenAI() : await attemptGroqPost(userContent);
+        const retry = await attemptGroqPost(userContent);
         if (retry) return parsePostResult(retry);
-        throw e;
-      } catch (e2) {
-        console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generatePost', error: e2?.message || String(e2) }));
-        throw e2;
-      }
+      } catch (_) {}
+      console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'groq', action: 'generatePost', error: e?.message || String(e) }));
+      throw e;
     }
     if (isRateLimitError(e)) {
       await new Promise((r) => setTimeout(r, 60000));
       try {
-        const retry = client ? await attemptOpenAI() : await attemptGroqPost(userContent);
+        const retry = await attemptGroqPost(userContent);
         if (retry) return parsePostResult(retry);
-        throw e;
-      } catch (e2) {
-        console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generatePost', error: e2?.message || String(e2) }));
-        throw e2;
-      }
+      } catch (_) {}
+      console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'groq', action: 'generatePost', error: e?.message || String(e) }));
+      throw e;
     }
-    if (isAuthError(e) && groqClient) {
-      try {
-        const parsed = await attemptGroqPost(userContent);
-        if (parsed) return parsePostResult(parsed);
-      } catch (groqErr) {
-        console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generatePost', error: e?.message ?? String(e) }));
-        throw e;
-      }
-    }
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'openai', action: 'generatePost', error: e?.message ?? String(e) }));
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'groq', action: 'generatePost', error: e?.message ?? String(e) }));
     throw e;
   }
 }
@@ -230,8 +210,9 @@ Given the post hook and content, return ONLY valid JSON with no markdown, no bac
 }
 Keep it professional and suitable for a LinkedIn post graphic.`;
 
+/** Visual prompt for images: OpenAI only. */
 export async function generateVisualPromptFromPost(hook, content) {
-  const openai = getClient();
+  const openai = getClient(); // requires OPENAI_API_KEY
   const text = [hook, content].filter(Boolean).join('\n\n').slice(0, 1500);
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -246,12 +227,13 @@ export async function generateVisualPromptFromPost(hook, content) {
   return JSON.parse(raw);
 }
 
+/** Images: OpenAI only (DALL-E). */
 export async function generateImage(visualPrompt) {
   try {
     if (!visualPrompt || typeof visualPrompt !== 'object') {
       return null;
     }
-    const openai = getClient();
+    const openai = getClient(); // requires OPENAI_API_KEY
     const v = visualPrompt;
     const prompt = `${v.visual_concept || 'Professional graphic'}. 
 Style: ${v.design_style || 'minimal, clean, professional'}. 

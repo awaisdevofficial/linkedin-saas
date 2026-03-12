@@ -398,9 +398,10 @@ app.post('/api/generate', async (req, res) => {
     if (userId !== user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
+    const force = !!req.body?.force;
     const { runGenerateJob } = await import('./src/jobs/generate.job.js');
-    logger.api('generate_triggered', { userId });
-    runGenerateJob(userId).catch((err) => logger.api('generate_job_error', { userId, error: err.message }));
+    logger.api('generate_triggered', { userId, force });
+    runGenerateJob(userId, { force }).catch((err) => logger.api('generate_job_error', { userId, error: err.message }));
     return res.status(200).json({ success: true, message: 'Generation started' });
   } catch (e) {
     return res.status(500).json({ error: 'Server error' });
