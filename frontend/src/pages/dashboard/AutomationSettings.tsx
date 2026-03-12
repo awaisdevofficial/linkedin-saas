@@ -97,19 +97,27 @@ const AutomationSettings = () => {
 
   const handleSaveEngage = async () => {
     if (!supabase || !user) return;
-    setSaving('engage');
     const client = supabase;
+    await client.from('engagement_settings').upsert(
+      { user_id: user.id, ...engageSettings },
+      { onConflict: 'user_id' }
+    );
+  };
+
+  const handleSaveAll = async () => {
+    if (!supabase || !user) return;
+    setSaving('all');
     try {
-      await client.from('engagement_settings').upsert(
-        {
-          user_id: user.id,
-          ...engageSettings,
-        },
-        { onConflict: 'user_id' }
-      );
-      toast.success('Engagement settings saved');
+      if (contentSettings) {
+        await supabase.from('user_content_settings').upsert(
+          { user_id: user.id, ...contentSettings, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+      }
+      await handleSaveEngage();
+      toast.success('All settings saved');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed');
+      toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(null);
     }
@@ -127,214 +135,196 @@ const AutomationSettings = () => {
   const postTone = contentSettings?.post_tone || 'professional';
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#10153E]">Automation Settings</h1>
-        <p className="text-sm text-[#6B7098]">Configure how PostPilot automates your LinkedIn activity</p>
+    <div className="max-w-3xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold tracking-tight text-[#0f172a]">Automation Settings</h1>
+        <p className="mt-1 text-[15px] text-[#64748b]">Configure how PostPilot automates your LinkedIn activity</p>
       </div>
 
-      <Card className="card-shadow border-none">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-              <Zap className="w-5 h-5 text-blue-600" />
+      <div className="space-y-6">
+        <Card className="border border-[#e2e8f0] shadow-sm rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
+                <Zap className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-semibold text-[#0f172a]">Post Generation</CardTitle>
+                <CardDescription className="text-[#64748b] mt-0.5">Configure how new posts are generated and published</CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-lg">Post Generation</CardTitle>
-              <CardDescription>Configure how posts are generated and published</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-0">
+            <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
+              <Label className="text-sm font-medium text-[#334155] cursor-pointer">Auto post generation</Label>
+              <Switch
+                checked={!generationPaused}
+                onCheckedChange={(checked) => handlePauseGeneration(!checked)}
+                disabled={!!saving}
+              />
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={!generationPaused}
-              onCheckedChange={(checked) => handlePauseGeneration(!checked)}
-              disabled={!!saving}
-            />
-            <Label className="text-sm">Auto-generation</Label>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={contentSettings?.enable_post_comment !== false}
-              onCheckedChange={(checked) =>
-                setContentSettings((s) => ({ ...(s || {}), enable_post_comment: checked }))
-              }
-              disabled={!!saving}
-            />
-            <Label className="text-sm">When publishing: Post suggested comments on my post</Label>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-4">
-            <Label>Niche</Label>
-            <div className="flex flex-wrap gap-2">
-              {niches.map((n) => (
-                <button
-                  key={n}
-                  onClick={() =>
-                    setContentSettings((s) => ({
-                      ...(s || {}),
-                      niche: n === 'Custom' ? 'custom' : n.toLowerCase(),
-                    }))
-                  }
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    niche === (n === 'Custom' ? 'custom' : n.toLowerCase())
-                      ? 'bg-[#2D5AF6] text-white'
-                      : 'bg-[#F6F8FC] text-[#6B7098] hover:bg-[#2D5AF6]/10'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
+            <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
+              <Label className="text-sm font-medium text-[#334155] cursor-pointer max-w-[280px]">Post suggested comments on my post when publishing</Label>
+              <Switch
+                checked={contentSettings?.enable_post_comment !== false}
+                onCheckedChange={(checked) =>
+                  setContentSettings((s) => ({ ...(s || {}), enable_post_comment: checked }))
+                }
+                disabled={!!saving}
+              />
             </div>
-          </div>
-
-          <div className="space-y-4">
-            <Label>Post Tone</Label>
-            <div className="flex flex-wrap gap-2">
-              {['professional', 'conversational', 'bold', 'educational'].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setContentSettings((s) => ({ ...(s || {}), post_tone: t }))}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    postTone === t ? 'bg-[#2D5AF6] text-white' : 'bg-[#F6F8FC] text-[#6B7098] hover:bg-[#2D5AF6]/10'
-                  }`}
-                >
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
+            <Separator className="bg-[#e2e8f0]" />
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-[#334155]">Niche</Label>
+              <div className="flex flex-wrap gap-2">
+                {niches.map((n) => (
+                  <button
+                    key={n}
+                    onClick={() =>
+                      setContentSettings((s) => ({
+                        ...(s || {}),
+                        niche: n === 'Custom' ? 'custom' : n.toLowerCase(),
+                      }))
+                    }
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      niche === (n === 'Custom' ? 'custom' : n.toLowerCase())
+                        ? 'bg-[#2D5AF6] text-white shadow-sm'
+                        : 'bg-[#f1f5f9] text-[#475569] hover:bg-[#e2e8f0]'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Target Audience</Label>
-            <Input
-              value={contentSettings?.target_audience || ''}
-              onChange={(e) =>
-                setContentSettings((s) => ({ ...(s || {}), target_audience: e.target.value }))
-              }
-              placeholder="e.g., SaaS founders, marketers"
-            />
-          </div>
-
-          <Button
-            className="bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-            onClick={handleSaveContent}
-            disabled={!!saving}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Save Post Generation
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="card-shadow border-none">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-green-600" />
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-[#334155]">Post tone</Label>
+              <div className="flex flex-wrap gap-2">
+                {['professional', 'conversational', 'bold', 'educational'].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setContentSettings((s) => ({ ...(s || {}), post_tone: t }))}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      postTone === t ? 'bg-[#2D5AF6] text-white shadow-sm' : 'bg-[#f1f5f9] text-[#475569] hover:bg-[#e2e8f0]'
+                    }`}
+                  >
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-lg">Engage Others</CardTitle>
-              <CardDescription>Auto-like and comment on other posts</CardDescription>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-[#334155]">Target audience</Label>
+              <Input
+                value={contentSettings?.target_audience || ''}
+                onChange={(e) =>
+                  setContentSettings((s) => ({ ...(s || {}), target_audience: e.target.value }))
+                }
+                placeholder="e.g. Sales, marketers"
+                className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6]"
+              />
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={engageSettings?.auto_liking !== false}
-              onCheckedChange={(checked) =>
-                setEngageSettings((s) => ({ ...s, auto_liking: checked }))
-              }
-              disabled={!!saving}
-            />
-            <Label className="text-sm">Enable auto-like on feed posts</Label>
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={engageSettings?.auto_commenting !== false}
-              onCheckedChange={(checked) =>
-                setEngageSettings((s) => ({ ...s, auto_commenting: checked }))
-              }
-              disabled={!!saving}
-            />
-            <Label className="text-sm">Enable comment on feed posts</Label>
-          </div>
-          <div className="space-y-2">
-            <Label>Comment Prompt</Label>
-            <Textarea
-              value={(engageSettings?.comment_prompt as string) || ''}
-              onChange={(e) =>
-                setEngageSettings((s) => ({ ...s, comment_prompt: e.target.value }))
-              }
-              rows={3}
-              placeholder="Write a short genuine LinkedIn comment..."
-            />
-          </div>
+          </CardContent>
+        </Card>
 
-          <Button
-            className="bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-            onClick={handleSaveEngage}
-            disabled={!!saving}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Save Engage Others
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="card-shadow border-none">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-              <Reply className="w-5 h-5 text-purple-600" />
+        <Card className="border border-[#e2e8f0] shadow-sm rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+                <MessageSquare className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-semibold text-[#0f172a]">Engage Others</CardTitle>
+                <CardDescription className="text-[#64748b] mt-0.5">Auto-like and comment on other posts</CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-lg">Reply to Comments</CardTitle>
-              <CardDescription>Auto-reply to comments on your posts</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-0">
+            <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
+              <Label className="text-sm font-medium text-[#334155] cursor-pointer">Enable auto-like on feed posts</Label>
+              <Switch
+                checked={engageSettings?.auto_liking !== false}
+                onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_liking: checked }))}
+                disabled={!!saving}
+              />
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={engageSettings?.auto_replying !== false}
-              onCheckedChange={(checked) =>
-                setEngageSettings((s) => ({ ...s, auto_replying: checked }))
-              }
-              disabled={!!saving}
-            />
-            <Label className="text-sm">Enable auto-reply to comments on my posts</Label>
-          </div>
-          <div className="space-y-2">
-            <Label>Reply Prompt</Label>
-            <Textarea
-              value={(contentSettings?.custom_reply_prompt as string) || ''}
-              onChange={(e) =>
-                setContentSettings((s) => ({ ...(s || {}), custom_reply_prompt: e.target.value }))
-              }
-              rows={3}
-              placeholder="Reply professionally and helpfully..."
-            />
-          </div>
+            <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
+              <Label className="text-sm font-medium text-[#334155] cursor-pointer">Enable comment on feed posts</Label>
+              <Switch
+                checked={engageSettings?.auto_commenting !== false}
+                onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_commenting: checked }))}
+                disabled={!!saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-[#334155]">Comment prompt</Label>
+              <Textarea
+                value={(engageSettings?.comment_prompt as string) || ''}
+                onChange={(e) => setEngageSettings((s) => ({ ...s, comment_prompt: e.target.value }))}
+                rows={3}
+                placeholder="Professional"
+                className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] resize-none"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-          <Button
-            className="bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-            onClick={async () => {
-              await handleSaveContent();
-              await handleSaveEngage();
-            }}
-            disabled={!!saving}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Save Reply Settings
-          </Button>
-        </CardContent>
-      </Card>
+        <Card className="border border-[#e2e8f0] shadow-sm rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+                <Reply className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-semibold text-[#0f172a]">Reply to Comments</CardTitle>
+                <CardDescription className="text-[#64748b] mt-0.5">Auto-reply to comments on your posts</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-0">
+            <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
+              <Label className="text-sm font-medium text-[#334155] cursor-pointer">Enable auto-reply to comments on my posts</Label>
+              <Switch
+                checked={engageSettings?.auto_replying !== false}
+                onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_replying: checked }))}
+                disabled={!!saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-[#334155]">Reply prompt</Label>
+              <Textarea
+                value={(contentSettings?.custom_reply_prompt as string) || ''}
+                onChange={(e) =>
+                  setContentSettings((s) => ({ ...(s || {}), custom_reply_prompt: e.target.value }))
+                }
+                rows={3}
+                placeholder="Reply professionally and helpfully..."
+                className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] resize-none"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-8 pt-6 border-t border-[#e2e8f0] flex justify-end">
+        <Button
+          onClick={handleSaveAll}
+          disabled={!!saving}
+          className="bg-[#2D5AF6] hover:bg-[#2563eb] text-white shadow-md rounded-xl px-8 py-6 text-base font-medium"
+        >
+          {saving ? (
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Saving...
+            </span>
+          ) : (
+            <>
+              <Save className="w-5 h-5 mr-2" />
+              Save all settings
+            </>
+          )}
+        </Button>
+      </div>
     </div>
   );
 };
