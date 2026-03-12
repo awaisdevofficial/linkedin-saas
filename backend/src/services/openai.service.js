@@ -244,32 +244,56 @@ Professional LinkedIn post image. Dark background. Clean typography. No people. 
 async function generateImageWithGemini(visualPrompt) {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return null;
+  // Google AI Studio keys start with AIza; other formats may be invalid for this API
+  if (!apiKey.startsWith('AIza')) {
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'gemini',
+      action: 'generateImage',
+      error: 'GEMINI_API_KEY should be from Google AI Studio (starts with AIza). Get one at https://aistudio.google.com/apikey',
+    }));
+    return null;
+  }
   const prompt = buildImagePrompt(visualPrompt);
   const url = `${GEMINI_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent`;
-  const res = await axios.post(
-    url,
-    {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseModalities: ['IMAGE', 'TEXT'],
+  try {
+    const res = await axios.post(
+      url,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ['IMAGE', 'TEXT'],
+        },
       },
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      timeout: 60000,
-      responseType: 'json',
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        timeout: 60000,
+        responseType: 'json',
+      }
+    );
+    const parts = res.data?.candidates?.[0]?.content?.parts ?? [];
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        return Buffer.from(part.inlineData.data, 'base64');
+      }
     }
-  );
-  const parts = res.data?.candidates?.[0]?.content?.parts ?? [];
-  for (const part of parts) {
-    if (part.inlineData?.data) {
-      return Buffer.from(part.inlineData.data, 'base64');
-    }
+    return null;
+  } catch (e) {
+    const status = e.response?.status;
+    const body = e.response?.data;
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'gemini',
+      action: 'generateImage',
+      error: e.message,
+      status,
+      detail: body?.error?.message || (typeof body === 'object' ? JSON.stringify(body).slice(0, 200) : body),
+    }));
+    return null;
   }
-  return null;
 }
 
 /** Images: Gemini (preferred when GEMINI_API_KEY set) or OpenAI DALL-E. Returns URL (string) or Buffer. */

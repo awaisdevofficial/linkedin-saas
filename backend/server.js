@@ -519,7 +519,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
       return res.status(503).json({
         error: 'Image generation unavailable',
         code: 'IMAGE_SERVICE_UNAVAILABLE',
-        message: 'Image generation is temporarily unavailable. Please ensure OPENAI_API_KEY is set and valid on the server.',
+        message: 'Image generation failed. Set a valid OPENAI_API_KEY or GEMINI_API_KEY (from Google AI Studio) in backend/.env and restart the server. Check server logs for details.',
       });
     }
     const mediaUrl = await imageService.processAndUploadImage(user.id, imageUrl);
