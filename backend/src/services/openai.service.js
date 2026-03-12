@@ -233,7 +233,15 @@ Professional LinkedIn post image. Dark background. Clean typography. No people. 
 /** Generate image via Gemini API; returns Buffer or null. */
 async function generateImageWithGemini(visualPrompt) {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'gemini',
+      action: 'generateImage',
+      error: 'GEMINI_API_KEY is empty or not set in process.env. Ensure backend/.env is loaded (e.g. dotenv in server.js).',
+    }));
+    return null;
+  }
   const prompt = buildImagePrompt(visualPrompt);
   const url = `${GEMINI_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent`;
   try {
@@ -260,6 +268,14 @@ async function generateImageWithGemini(visualPrompt) {
         return Buffer.from(part.inlineData.data, 'base64');
       }
     }
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'gemini',
+      action: 'generateImage',
+      error: 'Gemini returned 200 but no image in response',
+      hasCandidates: !!res.data?.candidates?.length,
+      partsLength: parts.length,
+    }));
     return null;
   } catch (e) {
     const status = e.response?.status;

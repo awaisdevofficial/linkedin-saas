@@ -3,7 +3,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '.env') });
+// Load .env from backend dir; fallback when PM2 cwd is project root
+const envPath = path.join(__dirname, '.env');
+dotenv.config({ path: envPath });
+if (!process.env.GEMINI_API_KEY?.trim()) {
+  const fallbackEnv = path.join(process.cwd(), 'backend', '.env');
+  if (fallbackEnv !== envPath) dotenv.config({ path: fallbackEnv });
+}
 
 import express from 'express';
 import cors from 'cors';
@@ -481,7 +487,10 @@ app.post('/api/regenerate-image', async (req, res) => {
 
 // POST /api/generate-image-for-post — generate image for a post (creates visual_prompt from text if missing)
 app.post('/api/generate-image-for-post', async (req, res) => {
-  // Skip if Gemini not configured for image generation
+  // Ensure backend .env is loaded (PM2 cwd may be project root)
+  if (!process.env.GEMINI_API_KEY?.trim()) {
+    dotenv.config({ path: path.join(process.cwd(), 'backend', '.env') });
+  }
   if (!process.env.GEMINI_API_KEY?.trim()) {
     return res.status(503).json({
       error: 'Image generation not available',
@@ -685,7 +694,8 @@ app.post('/api/publish-now', async (req, res) => {
 app.use('/admin', adminRoutes);
 
 app.listen(PORT, () => {
-  logger.info('server_started', { port: PORT, backendUrl: BACKEND_URL });
+  const hasGemini = !!process.env.GEMINI_API_KEY?.trim();
+  logger.info('server_started', { port: PORT, backendUrl: BACKEND_URL, geminiKeySet: hasGemini });
   if (!LINKEDIN_CLIENT_ID || !LINKEDIN_CLIENT_SECRET) {
     logger.warn('linkedin_oauth_not_configured', { hint: 'Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET' });
   }
