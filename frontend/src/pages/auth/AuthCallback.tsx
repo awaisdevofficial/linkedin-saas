@@ -5,33 +5,54 @@ import { supabase } from '@/lib/supabase';
 /**
  * Handles OAuth callback after LinkedIn sign-in.
  * Backend redirects to Supabase magic link which lands here with hash params.
+ * We must let Supabase parse the hash (#access_token=...) and store the session.
  */
 const AuthCallback = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase) {
-      setError('Supabase not configured');
-      return;
-    }
-    supabase.auth.getSession().then(({ data: { session }, error: err }) => {
-      if (err) {
-        setError(err.message);
+    const run = async () => {
+      if (!supabase) {
+        setError('Supabase not configured');
         return;
       }
-      if (session) {
-        navigate('/dashboard', { replace: true });
-      } else {
-        // Fallback from backend when magic link failed
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('fallback') === '1') {
-          setError('Sign-in completed but session could not be established. Try logging in again.');
-        } else {
-          navigate('/auth/login', { replace: true });
+
+      try {
+        // If this is a magic-link redirect, extract the session from the URL hash.
+        // Supabase JS v2 typings may not expose getSessionFromUrl, so access via any.
+        if (window.location.hash.includes('access_token=')) {
+          const { error: urlError } = await (supabase.auth as any).getSessionFromUrl?.({
+            storeSession: true,
+          });
+          if (urlError) {
+            setError(urlError.message);
+            return;
+          }
         }
+
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          setError(sessionError.message);
+          return;
+        }
+
+        if (session) {
+          navigate('/dashboard', { replace: true });
+        } else {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('fallback') === '1') {
+            setError('Sign-in completed but session could not be established. Try logging in again.');
+          } else {
+            navigate('/auth/login', { replace: true });
+          }
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Unexpected error during sign-in callback.');
       }
-    });
+    };
+
+    run();
   }, [navigate]);
 
   if (error) {
