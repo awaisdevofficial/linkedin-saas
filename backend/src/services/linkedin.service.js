@@ -266,9 +266,22 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
 }
 
 export async function commentOnPost(credentials, postUrn, commentText) {
+  // v2/socialActions ONLY accepts activity URNs
+  // Convert ugcPost or share URN to activity URN (same numeric ID, different prefix)
+  let urn = postUrn;
+  if (
+    String(postUrn).startsWith('urn:li:ugcPost:') ||
+    String(postUrn).startsWith('urn:li:share:')
+  ) {
+    const id = String(postUrn).split(':').pop();
+    urn = `urn:li:activity:${id}`;
+  } else if (!String(postUrn).startsWith('urn:')) {
+    urn = `urn:li:activity:${postUrn}`;
+  }
+
   try {
     const res = await axios.post(
-      `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(postUrn)}/comments`,
+      `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(urn)}/comments`,
       {
         actor: credentials.personUrn,
         message: { text: commentText },
@@ -281,11 +294,31 @@ export async function commentOnPost(credentials, postUrn, commentText) {
         },
       }
     );
-    console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'commentOnPost', postUrn, status: res.status }));
+    console.log(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        service: 'linkedin',
+        action: 'commentOnPost',
+        originalUrn: postUrn,
+        resolvedUrn: urn,
+        status: res.status,
+      })
+    );
     return res.headers?.['x-restli-id'] || res.data?.id;
   } catch (e) {
-    const detail = e.response?.data ? JSON.stringify(e.response.data) : e.message;
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'commentOnPost', postUrn, error: detail }));
+    const detail = e.response?.data
+      ? JSON.stringify(e.response.data)
+      : e.message;
+    console.error(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        service: 'linkedin',
+        action: 'commentOnPost',
+        originalUrn: postUrn,
+        resolvedUrn: urn,
+        error: detail,
+      })
+    );
     throw e;
   }
 }
