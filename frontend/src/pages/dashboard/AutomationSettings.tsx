@@ -329,6 +329,9 @@ const AutomationSettings = () => {
               <div className="rounded-xl bg-[#eff6ff] border border-[#bfdbfe] p-3 text-sm text-[#1e40af]">
                 When a post has a generated video, the video will be posted to LinkedIn when you publish (manually or via schedule).
               </div>
+              <div className="rounded-xl bg-[#f0fdf4] border border-[#bbf7d0] p-3 text-sm text-[#166534]">
+                The image is generated from the post content; the video is also generated from the post content. In automation, whatever you provide below (post content or your custom captions) will be used for generation.
+              </div>
               <Separator className="bg-[#e2e8f0]" />
               <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
                 <Label className="text-sm font-medium text-[#334155] cursor-pointer">Auto-generate image for new posts</Label>

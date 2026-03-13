@@ -425,7 +425,7 @@ const PostsActivity = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#10153E]">Posts Activity</h1>
-          <p className="text-sm text-[#6B7098]">Manage and schedule your LinkedIn posts</p>
+          <p className="text-sm text-[#6B7098]">Manage and schedule your LinkedIn posts. Images and videos are generated from your post content.</p>
         </div>
         <div className="flex gap-2">
           <Tooltip>
@@ -648,7 +648,7 @@ const PostsActivity = () => {
                         )}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={6}>Generate image for this post</TooltipContent>
+                    <TooltipContent side="bottom" sideOffset={6}>Generate image from post content</TooltipContent>
                   </Tooltip>
                 )}
                 {!post.posted && (
@@ -657,9 +657,9 @@ const PostsActivity = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
                         onClick={() => handleGenerateVideo(post.id)}
-                        disabled={!!actionLoading}
+                        disabled={!!actionLoading || !post.media_url}
                       >
                         {actionLoading === `video:${post.id}` ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -669,7 +669,7 @@ const PostsActivity = () => {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" sideOffset={6}>
-                      Generate video (image created automatically if needed)
+                      {post.media_url ? 'Generate video from post content' : 'Generate an image first'}
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -1051,10 +1051,10 @@ const PostsActivity = () => {
                       )}
                       <Button
                         variant="outline"
-                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
                         onClick={() => handleGenerateVideo(viewPost.id)}
-                        disabled={!!actionLoading}
-                        title={viewPost.video_url ? 'Regenerate video' : 'Generate video (image created automatically if needed)'}
+                        disabled={!!actionLoading || !viewPost.media_url}
+                        title={!viewPost.media_url ? 'Generate an image first' : (viewPost.video_url ? 'Regenerate video from post content' : 'Generate video from post content')}
                       >
                         {actionLoading === `video:${viewPost.id}` ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
