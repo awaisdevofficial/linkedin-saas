@@ -113,6 +113,40 @@ const Onboarding = () => {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
+  /** Skip onboarding: save minimal defaults so user is marked as onboarded, then go to dashboard. */
+  const handleSkip = async () => {
+    if (!supabase || !user) return;
+    setError(null);
+    setIsLoading(true);
+    try {
+      const userId = user.id;
+      await supabase.from('user_content_settings').upsert(
+        {
+          user_id: userId,
+          niche: 'tech',
+          post_tone: 'professional',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+      const days = ['Monday', 'Wednesday', 'Friday'];
+      await supabase.from('schedules').delete().eq('user_id', userId);
+      for (const day of days) {
+        await supabase.from('schedules').insert({
+          user_id: userId,
+          day,
+          time_slots: ['09:00', '12:00', '18:00'],
+          enabled: true,
+        });
+      }
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not skip');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const progress = (currentStep / 3) * 100;
 
   return (
@@ -139,7 +173,7 @@ const Onboarding = () => {
               <h1 className="text-2xl font-bold text-[#10153E] mb-2">Connect your LinkedIn</h1>
               <p className="text-[#6B7098] mb-8">
                 We use your LinkedIn session to post and engage on your behalf. You can also connect
-                via OAuth in Settings.
+                via OAuth in Settings. You can skip and set this up later if you prefer.
               </p>
 
               <div className="space-y-6">
@@ -317,14 +351,24 @@ const Onboarding = () => {
               Back
             </Button>
 
-            <Button
-              onClick={handleNext}
-              disabled={isLoading}
-              className="bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full px-8 h-12"
-            >
-              {isLoading ? 'Loading...' : currentStep === 3 ? 'Go to Dashboard' : 'Next'}
-              {currentStep < 3 && !isLoading && <ChevronRight className="w-4 h-4 ml-1" />}
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                className="text-[#6B7098] hover:text-[#10153E]"
+                onClick={handleSkip}
+                disabled={isLoading}
+              >
+                Skip for now
+              </Button>
+              <Button
+                onClick={handleNext}
+                disabled={isLoading}
+                className="bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full px-8 h-12"
+              >
+                {isLoading ? 'Loading...' : currentStep === 3 ? 'Go to Dashboard' : 'Next'}
+                {currentStep < 3 && !isLoading && <ChevronRight className="w-4 h-4 ml-1" />}
+              </Button>
+            </div>
           </div>
         </div>
       </main>

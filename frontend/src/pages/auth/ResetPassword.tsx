@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/supabase';
+import { apiCalls } from '@/lib/api';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const ResetPassword = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [session, setSession] = useState<{ access_token: string } | null>(null);
   const [formData, setFormData] = useState({
     password: '',
     confirmPassword: '',
@@ -24,8 +26,9 @@ const ResetPassword = () => {
       setHasSession(false);
       return;
     }
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session);
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setHasSession(!!s);
+      setSession(s ?? null);
     });
   }, []);
 
@@ -50,6 +53,14 @@ const ResetPassword = () => {
       if (err) {
         setError(err.message);
         return;
+      }
+      // Sync to backend user_passwords so email+password login works
+      if (session?.access_token) {
+        try {
+          await apiCalls.updatePassword(session.access_token, formData.password);
+        } catch (_) {
+          // Non-fatal; Supabase auth is updated
+        }
       }
       setIsSuccess(true);
     } catch (err) {

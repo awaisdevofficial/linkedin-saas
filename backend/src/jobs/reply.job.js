@@ -1,6 +1,6 @@
 import * as supabase from '../services/supabase.service.js';
 import * as promptService from '../services/prompt.service.js';
-import * as openai from '../services/openai.service.js';
+import * as groq from '../services/groq.service.js';
 import * as linkedin from '../services/linkedin.service.js';
 import { logger } from '../utils/logger.js';
 
@@ -72,7 +72,7 @@ export async function runReplyJob() {
                 ? promptService.buildReplyPrompt(userSettings, template.prompt, post.content, comment.text)
                 : `Reply to this LinkedIn comment on my post in one short, genuine, friendly sentence. No emojis. No hashtags. Comment: "${comment.text}". Return only the reply text.`;
 
-              const replyText = await openai.generateReply(prompt);
+              const replyText = await groq.generateReply(prompt);
 
               const delay = 60000 + Math.random() * 60000; // 1-2 min production delay
               await new Promise((r) => setTimeout(r, delay));

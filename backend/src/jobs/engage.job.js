@@ -1,6 +1,6 @@
 import * as supabase from '../services/supabase.service.js';
 import * as promptService from '../services/prompt.service.js';
-import * as openai from '../services/openai.service.js';
+import * as groq from '../services/groq.service.js';
 import * as linkedin from '../services/linkedin.service.js';
 import * as feed from '../services/feed.service.js';
 import { logger } from '../utils/logger.js';
@@ -133,7 +133,7 @@ export async function runEngageJob() {
                     : 'Write a short, genuine, professional LinkedIn comment (max 15 words). No emojis. No hashtags. Return only the comment text.';
                 }
 
-                const commentText = await openai.generateComment(item.description, builtPrompt);
+                const commentText = await groq.generateComment(item.description, builtPrompt);
                 if (commentText?.trim()) {
                   // Use confirmed URN from like response if available, otherwise fall back to activityId
                   const urnToComment = item._confirmedActivityUrn || item.activity_id;

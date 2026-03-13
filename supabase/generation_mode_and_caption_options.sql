@@ -1,5 +1,5 @@
 -- Generation mode, custom prompt, and image/video caption options (run in Supabase SQL Editor FIRST)
--- Then apply code changes to generate.job.js, openai.service.js, AutomationSettings.tsx
+-- Then apply code changes to generate.job.js, groq.service.js, AutomationSettings.tsx
 
 -- user_content_settings: generation mode (auto = RSS/niche, custom = user instructions)
 ALTER TABLE public.user_content_settings

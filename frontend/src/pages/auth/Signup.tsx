@@ -1,27 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft, Linkedin } from 'lucide-react';
+import { ArrowLeft, Linkedin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
 import { OAUTH_BACKEND_URL } from '@/lib/config';
 
+/**
+ * Sign up is LinkedIn only. New users will set a password after first sign-in.
+ */
 const Signup = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    agreeToTerms: false,
-  });
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -30,43 +20,8 @@ const Signup = () => {
   }, [user, authLoading, navigate]);
 
   const handleLinkedIn = () => {
+    setIsRedirecting(true);
     window.location.href = `${OAUTH_BACKEND_URL}/auth/linkedin`;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.agreeToTerms) {
-      setError('Please agree to the Terms of Service and Privacy Policy');
-      return;
-    }
-    setError(null);
-    setIsLoading(true);
-    try {
-      if (!supabase) {
-        setError('Supabase not configured');
-        return;
-      }
-      const { error: err } = await supabase.auth.signUp({
-        email: formData.email.trim(),
-        password: formData.password,
-        options: {
-          data: { full_name: formData.fullName.trim() },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (err) {
-        setError(err.message);
-        return;
-      }
-      navigate('/auth/login', {
-        replace: true,
-        state: { message: 'Check your email to confirm your account.' },
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Signup failed');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   if (authLoading) {
@@ -98,104 +53,18 @@ const Signup = () => {
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-[#10153E] mb-2">Create your account</h1>
             <p className="text-sm text-[#6B7098]">
-              Start your free trial today. No credit card required.
+              Sign up with LinkedIn. After signing in, you&apos;ll set a password so you can also log in with email next time.
             </p>
           </div>
 
-          {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-[#10153E]">Full name</Label>
-              <Input
-                id="fullName"
-                type="text"
-                placeholder="John Doe"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#2D5AF6] focus:ring-[#2D5AF6]/20"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#10153E]">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#2D5AF6] focus:ring-[#2D5AF6]/20"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-[#10153E]">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Create a strong password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#2D5AF6] focus:ring-[#2D5AF6]/20 pr-12"
-                  required
-                  minLength={8}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7098] hover:text-[#10153E]"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <Checkbox
-                id="terms"
-                checked={formData.agreeToTerms}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, agreeToTerms: checked as boolean })
-                }
-                className="mt-0.5"
-              />
-              <Label htmlFor="terms" className="text-sm text-[#6B7098] cursor-pointer leading-relaxed">
-                I agree to the{' '}
-                <a href="#" className="text-[#2D5AF6] hover:underline">Terms of Service</a>
-                {' '}and{' '}
-                <a href="#" className="text-[#2D5AF6] hover:underline">Privacy Policy</a>
-              </Label>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-12 bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full font-medium"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Creating account...' : 'Create account'}
-            </Button>
-          </form>
-
-          <div className="flex items-center gap-4 my-6">
-            <Separator className="flex-1 bg-[#6B7098]/15" />
-            <span className="text-xs text-[#6B7098]">Or continue with</span>
-            <Separator className="flex-1 bg-[#6B7098]/15" />
-          </div>
-
           <Button
-            variant="outline"
-            className="w-full h-12 rounded-full border-[#6B7098]/20 hover:bg-[#F6F8FC]"
+            className="w-full h-12 rounded-full bg-[#0077B5] hover:bg-[#006097] text-white font-medium"
             onClick={handleLinkedIn}
+            disabled={isRedirecting}
             type="button"
           >
-            <Linkedin className="w-5 h-5 mr-2 text-[#0077B5]" />
-            Continue with LinkedIn
+            <Linkedin className="w-5 h-5 mr-2" />
+            {isRedirecting ? 'Redirecting...' : 'Sign up with LinkedIn'}
           </Button>
 
           <p className="text-center mt-6 text-sm text-[#6B7098]">

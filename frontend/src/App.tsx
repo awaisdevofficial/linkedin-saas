@@ -8,6 +8,7 @@ import Signup from './pages/auth/Signup';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import AuthCallback from './pages/auth/AuthCallback';
+import SetPassword from './pages/auth/SetPassword';
 import Onboarding from './pages/onboarding/Onboarding';
 import DashboardLayout from './layouts/DashboardLayout';
 import DashboardHome from './pages/dashboard/DashboardHome';
@@ -46,6 +47,14 @@ function App() {
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route
+              path="/auth/set-password"
+              element={
+                <ProtectedRoute>
+                  <SetPassword />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/onboarding"

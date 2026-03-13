@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { apiCalls } from '@/lib/api';
 
 /**
  * Handles OAuth callback after LinkedIn sign-in.
  * Backend redirects to Supabase magic link which lands here with hash params.
  * We must let Supabase parse the hash (#access_token=...) and store the session.
+ * New users without a password are sent to /auth/set-password first.
  */
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -48,7 +50,18 @@ const AuthCallback = () => {
         }
 
         if (session) {
-          // New users: send to onboarding; returning users (have content settings) go to dashboard
+          // New LinkedIn users: if they have no password set, send to set-password first
+          try {
+            const { hasPassword } = await apiCalls.hasPassword(session.access_token);
+            if (!hasPassword) {
+              window.location.replace('/auth/set-password');
+              return;
+            }
+          } catch {
+            // If API fails, continue to onboarding/dashboard
+          }
+
+          // Returning users: check onboarding
           let hasCompletedOnboarding = false;
           try {
             const { data: settings } = await supabase

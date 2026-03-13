@@ -1,5 +1,5 @@
 /**
- * AI usage: content, comments, replies, visual prompts = Groq only.
+ * Text AI: posts, comments, replies, visual prompts = Groq only.
  * Images/video = Freepik (user API key) via freepik.service.js.
  */
 import Groq from 'groq-sdk';
@@ -105,7 +105,7 @@ async function attemptGroqPost(userContent) {
   }
 }
 
-/** Content generation (posts): Groq only. */
+/** Content generation (posts): Groq. */
 export async function generatePost(article, userSettings) {
   if (!groqClient) throw new Error('GROQ_API_KEY required for content generation');
   const userContent = buildUserMessage(article, userSettings || {});
@@ -138,7 +138,7 @@ export async function generatePost(article, userSettings) {
   }
 }
 
-// Generate post from a user's custom instruction prompt (no article/RSS needed)
+/** Generate post from a user's custom instruction prompt (no article/RSS needed). */
 export async function generatePostFromCustomPrompt(customPrompt, settings) {
   if (!groqClient) return null;
   const systemPrompt = `You are a professional LinkedIn content creator.
@@ -177,7 +177,7 @@ Return ONLY the JSON. No markdown. No explanation.`;
   } catch (e) {
     console.error(JSON.stringify({
       timestamp: new Date().toISOString(),
-      service: 'openai',
+      service: 'groq',
       action: 'generatePostFromCustomPrompt',
       error: e.message,
     }));
@@ -185,6 +185,7 @@ Return ONLY the JSON. No markdown. No explanation.`;
   }
 }
 
+/** Generate a short comment for engaging on others' posts. */
 export async function generateComment(postDescription, systemPrompt) {
   if (!groqClient) throw new Error('GROQ_API_KEY not set');
   try {
@@ -210,6 +211,7 @@ export async function generateComment(postDescription, systemPrompt) {
   }
 }
 
+/** Generate a reply to a comment on the user's post. */
 export async function generateReply(systemPrompt) {
   if (!groqClient) throw new Error('GROQ_API_KEY not set');
   try {
@@ -274,7 +276,7 @@ export function buildImagePromptFromVisual(visualPrompt) {
 
 /**
  * Build prompt from post caption/content for image and video generation.
- * Used as the single source for both manual and auto image; and for video.
+ * Used for Freepik image/video; images/videos are Freepik, text is Groq.
  */
 export function buildPromptFromPostContent(hook, content) {
   const parts = [hook, content].filter(Boolean).map((s) => String(s).trim());

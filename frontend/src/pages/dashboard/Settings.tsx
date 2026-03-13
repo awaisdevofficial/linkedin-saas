@@ -11,7 +11,10 @@ import {
   Shield,
   HelpCircle,
   CheckCircle,
+  Key,
+  Lock,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,15 +32,20 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
+import { apiCalls } from '@/lib/api';
 import { OAUTH_BACKEND_URL } from '@/lib/config';
 import { toast } from 'sonner';
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [showCookie, setShowCookie] = useState(false);
   const [showSessionId, setShowSessionId] = useState(false);
   const [showCookieHelp, setShowCookieHelp] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [profile, setProfile] = useState<{
     full_name?: string;
     email?: string;
@@ -120,6 +128,34 @@ const Settings = () => {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+    const token = session?.access_token;
+    if (!token) {
+      setPasswordError('Session expired. Please sign in again.');
+      return;
+    }
+    setSaving('password');
+    try {
+      await apiCalls.changePassword(token, passwordForm.currentPassword, passwordForm.newPassword);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      toast.success('Password updated');
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Failed to change password');
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const handleDisconnect = async () => {
     if (!supabase || !user) return;
     try {
@@ -149,6 +185,10 @@ const Settings = () => {
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             Profile
+          </TabsTrigger>
+          <TabsTrigger value="password" className="flex items-center gap-2">
+            <Key className="w-4 h-4" />
+            Password
           </TabsTrigger>
           <TabsTrigger value="linkedin" className="flex items-center gap-2">
             <Link2 className="w-4 h-4" />
@@ -207,6 +247,91 @@ const Settings = () => {
                 <Save className="w-4 h-4 mr-2" />
                 Save Changes
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="password">
+          <Card className="card-shadow border-none">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#2D5AF6]/10 flex items-center justify-center">
+                  <Lock className="w-5 h-5 text-[#2D5AF6]" />
+                </div>
+                <div>
+                  <CardTitle>Password</CardTitle>
+                  <CardDescription>Change your password to sign in with email, or use LinkedIn</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {passwordError && (
+                <div className="p-3 rounded-xl bg-red-50 text-red-700 text-sm">{passwordError}</div>
+              )}
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Current password</Label>
+                  <div className="relative">
+                    <Input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
+                      placeholder="Enter current password"
+                      className="pr-12"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7098]"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>New password</Label>
+                  <div className="relative">
+                    <Input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
+                      placeholder="At least 8 characters"
+                      className="pr-12"
+                      required
+                      minLength={8}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7098]"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Confirm new password</Label>
+                  <Input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="bg-[#2D5AF6] hover:bg-[#1E4AD6]" disabled={!!saving}>
+                  <Save className="w-4 h-4 mr-2" />
+                  Change password
+                </Button>
+              </form>
+              <Separator />
+              <p className="text-sm text-[#6B7098]">
+                Forgot your password?{' '}
+                <Link to="/auth/forgot-password" className="text-[#2D5AF6] hover:underline font-medium">
+                  Reset it here
+                </Link>
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

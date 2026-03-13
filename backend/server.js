@@ -379,6 +379,96 @@ app.post('/auth/login-email', async (req, res) => {
   res.json({ redirectUrl: linkData.properties.action_link });
 });
 
+// GET /auth/has-password — check if user has a password set (for redirecting new LinkedIn users to set-password)
+app.get('/auth/has-password', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const { data: pw } = await supabaseAdmin.from('user_passwords').select('user_id').eq('user_id', user.id).maybeSingle();
+    return res.json({ hasPassword: !!pw?.user_id });
+  } catch (e) {
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /auth/set-password — new user (e.g. after LinkedIn signup) sets password for email login
+app.post('/auth/set-password', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  const { password } = req.body || {};
+  if (!password || typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hash = await bcrypt.hash(password, 10);
+    const { error } = await supabaseAdmin.from('user_passwords').upsert(
+      { user_id: user.id, password_hash: hash, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    );
+    if (error) return res.status(500).json({ error: 'Failed to save password' });
+    logger.auth('set_password_success', { userId: user.id });
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /auth/change-password — logged-in user changes password (current + new)
+app.post('/auth/change-password', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword || newPassword.length < 8) {
+    return res.status(400).json({ error: 'Provide current password and new password (min 8 characters)' });
+  }
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const { data: pw } = await supabaseAdmin.from('user_passwords').select('password_hash').eq('user_id', user.id).maybeSingle();
+    if (!pw?.password_hash) return res.status(400).json({ error: 'No password set. Use Set password or sign in with LinkedIn.' });
+    const ok = await bcrypt.compare(currentPassword, pw.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+    const hash = await bcrypt.hash(newPassword, 10);
+    const { error } = await supabaseAdmin.from('user_passwords').upsert(
+      { user_id: user.id, password_hash: hash, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    );
+    if (error) return res.status(500).json({ error: 'Failed to update password' });
+    logger.auth('change_password_success', { userId: user.id });
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /auth/update-password — after forgot-password reset flow; syncs new password to user_passwords
+app.post('/auth/update-password', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  const { newPassword } = req.body || {};
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hash = await bcrypt.hash(newPassword, 10);
+    const { error } = await supabaseAdmin.from('user_passwords').upsert(
+      { user_id: user.id, password_hash: hash, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    );
+    if (error) return res.status(500).json({ error: 'Failed to save password' });
+    logger.auth('update_password_success', { userId: user.id });
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   logger.api('health_check', { linkedin: !!LINKEDIN_CLIENT_ID, supabase: !!supabaseAdmin });
@@ -462,11 +552,11 @@ app.post('/api/regenerate-image', async (req, res) => {
     const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
-    const openaiService = await import('./src/services/openai.service.js');
+    const groqService = await import('./src/services/groq.service.js');
     const imageService = await import('./src/services/image.service.js');
     const post = await supabaseService.getPostByIdAndUser(postId, user.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
-    const prompt = openaiService.buildPromptFromPostContent(post.hook || '', post.content || '') || openaiService.buildImagePromptFromVisual(post.visual_prompt);
+    const prompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || groqService.buildImagePromptFromVisual(post.visual_prompt);
     if (!prompt) return res.status(400).json({ error: 'Add a hook or content to the post to generate an image' });
     const settings = await supabaseService.getUserContentSettings(user.id);
     const apiKey = settings?.freepik_api_key?.trim();
@@ -500,7 +590,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
     const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
-    const openaiService = await import('./src/services/openai.service.js');
+    const groqService = await import('./src/services/groq.service.js');
     const freepikService = await import('./src/services/freepik.service.js');
     const imageService = await import('./src/services/image.service.js');
     const settings = await supabaseService.getUserContentSettings(user.id);
@@ -514,7 +604,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
     }
     const post = await supabaseService.getPostByIdAndUser(postId, user.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
-    const prompt = openaiService.buildPromptFromPostContent(post.hook || '', post.content || '');
+    const prompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '');
     if (!prompt) return res.status(400).json({ error: 'Add a hook or content to the post to generate an image' });
     const imageUrl = await freepikService.generateImage(apiKey, prompt, 'widescreen_16_9');
     if (!imageUrl) {
@@ -551,7 +641,7 @@ app.post('/api/generate-video-for-post', async (req, res) => {
     const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
-    const openaiService = await import('./src/services/openai.service.js');
+    const groqService = await import('./src/services/groq.service.js');
     const freepikService = await import('./src/services/freepik.service.js');
     const imageService = await import('./src/services/image.service.js');
     const settings = await supabaseService.getUserContentSettings(user.id);
@@ -570,7 +660,7 @@ app.post('/api/generate-video-for-post', async (req, res) => {
       return res.status(400).json({ error: 'Post must have an image first. Generate an image, then generate video.' });
     }
     const duration = req.body?.duration === '10' ? '10' : '5';
-    const motionPrompt = openaiService.buildPromptFromPostContent(post.hook || '', post.content || '') || 'Subtle professional motion, suitable for LinkedIn.';
+    const motionPrompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || 'Subtle professional motion, suitable for LinkedIn.';
     const videoUrl = await freepikService.generateVideo(apiKey, imageUrl, duration, motionPrompt);
     if (!videoUrl) {
       return res.status(503).json({
@@ -601,7 +691,7 @@ app.post('/api/regenerate-post', async (req, res) => {
     const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
-    const openaiService = await import('./src/services/openai.service.js');
+    const groqService = await import('./src/services/groq.service.js');
     const rssService = await import('./src/services/rss.service.js');
     const post = await supabaseService.getPostByIdAndUser(postId, user.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -614,7 +704,7 @@ app.post('/api/regenerate-post', async (req, res) => {
     );
     const article = (articles || [])[0];
     if (!article) return res.status(400).json({ error: 'No articles in feed; add niche or RSS first' });
-    const result = await openaiService.generatePost(article, settings);
+    const result = await groqService.generatePost(article, settings);
     if (!result) return res.status(500).json({ error: 'Content generation failed' });
     await supabaseService.updatePost(postId, {
       hook: result.headline_hook || result.hook || '',
@@ -680,10 +770,10 @@ app.post('/api/publish-now', async (req, res) => {
         const contentSettings = await supabaseService.getUserContentSettings(user.id);
         const freepikKey = contentSettings?.freepik_api_key?.trim();
         if (freepikKey) {
-          const openaiService = await import('./src/services/openai.service.js');
+          const groqService = await import('./src/services/groq.service.js');
           const freepikService = await import('./src/services/freepik.service.js');
           const { processAndUploadImage } = await import('./src/services/image.service.js');
-          const prompt = openaiService.buildPromptFromPostContent(post.hook || '', post.content || '') || openaiService.buildImagePromptFromVisual(post.visual_prompt);
+          const prompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || groqService.buildImagePromptFromVisual(post.visual_prompt);
           if (!prompt) {
             logger.api('publish_now_image_skipped', { postId, reason: 'no_prompt' });
           } else {

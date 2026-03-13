@@ -88,6 +88,22 @@ export const apiCalls = {
       body: { email, password, redirect },
     }),
 
+  hasPassword: (token: string) =>
+    api<{ hasPassword: boolean }>('/auth/has-password', { token }),
+
+  setPassword: (token: string, password: string) =>
+    api<{ success: boolean }>('/auth/set-password', { token, method: 'POST', body: { password } }),
+
+  changePassword: (token: string, currentPassword: string, newPassword: string) =>
+    api<{ success: boolean }>('/auth/change-password', {
+      token,
+      method: 'POST',
+      body: { currentPassword, newPassword },
+    }),
+
+  updatePassword: (token: string, newPassword: string) =>
+    api<{ success: boolean }>('/auth/update-password', { token, method: 'POST', body: { newPassword } }),
+
   adminHealth: (adminKey: string) =>
     api<unknown>('/admin/health', { adminKey }),
 

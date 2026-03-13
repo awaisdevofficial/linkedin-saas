@@ -1,5 +1,5 @@
 import * as supabase from '../services/supabase.service.js';
-import * as openai from '../services/openai.service.js';
+import * as groq from '../services/groq.service.js';
 import * as freepik from '../services/freepik.service.js';
 import * as rss from '../services/rss.service.js';
 import * as imageService from '../services/image.service.js';
@@ -68,7 +68,7 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
         logger.automation('generate_job_custom_mode', { userId });
 
         // Use the custom prompt directly — no RSS, no niche lookup
-        const result = await openai.generatePostFromCustomPrompt(customPrompt, settings);
+        const result = await groq.generatePostFromCustomPrompt(customPrompt, settings);
         if (!result) continue;
 
         const postId = await supabase.createPost(userId, {
@@ -124,7 +124,7 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
         for (const { user, settings } of group) {
           const userId = user.user_id;
           try {
-            const result = await openai.generatePost(article, settings);
+            const result = await groq.generatePost(article, settings);
             if (!result) continue;
 
             const postId = await supabase.createPost(userId, {
@@ -187,10 +187,10 @@ async function handleMediaGeneration(postId, userId, settings, result, errors) {
       const imagePrompt =
         settings.image_caption_mode === 'custom' && settings.custom_image_caption?.trim()
           ? settings.custom_image_caption.trim()
-          : openai.buildPromptFromPostContent(
+          : groq.buildPromptFromPostContent(
               result.headline_hook || result.hook || '',
               result.post_copy || result.content || ''
-            ) || openai.buildImagePromptFromVisual(result.visual_prompt);
+            ) || groq.buildImagePromptFromVisual(result.visual_prompt);
 
       if (imagePrompt) {
         logger.automation('generate_job_image_start', { userId, postId, captionMode: settings.image_caption_mode || 'content' });
@@ -222,10 +222,10 @@ async function handleMediaGeneration(postId, userId, settings, result, errors) {
       const videoPrompt =
         settings.video_caption_mode === 'custom' && settings.custom_video_caption?.trim()
           ? settings.custom_video_caption.trim()
-          : openai.buildPromptFromPostContent(
+          : groq.buildPromptFromPostContent(
               result.headline_hook || result.hook || '',
               result.post_copy || result.content || ''
-            ) || openai.buildImagePromptFromVisual(result.visual_prompt);
+            ) || groq.buildImagePromptFromVisual(result.visual_prompt);
 
       if (videoPrompt) {
         logger.automation('generate_job_video_start', { userId, postId, captionMode: settings.video_caption_mode || 'content' });
