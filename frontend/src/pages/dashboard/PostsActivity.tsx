@@ -88,6 +88,7 @@ const PostsActivity = () => {
   const [profile, setProfile] = useState<{ avatar_url?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [kieKeyPaid, setKieKeyPaid] = useState<boolean | null>(null);
 
   const [newPost, setNewPost] = useState({
     hook: '',
@@ -122,6 +123,9 @@ const PostsActivity = () => {
     if (accessToken && !generationPausedFetched.current) {
       generationPausedFetched.current = true;
       apiCalls.getGenerationPaused(accessToken).then((r) => setGenerationPaused(r.generation_paused)).catch(() => {});
+    }
+    if (accessToken) {
+      apiCalls.getKieKeyStatus(accessToken).then((r) => setKieKeyPaid(r.paid)).catch(() => setKieKeyPaid(false));
     }
 
     const channel = client
@@ -673,7 +677,7 @@ const PostsActivity = () => {
                         variant="outline"
                         className="rounded-full"
                         onClick={() => handleGenerateImage(post.id)}
-                        disabled={!!actionLoading}
+                        disabled={!!actionLoading || kieKeyPaid !== true}
                       >
                         {actionLoading === `image:${post.id}` ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -682,7 +686,9 @@ const PostsActivity = () => {
                         )}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={6}>Generate image from post content</TooltipContent>
+                    <TooltipContent side="bottom" sideOffset={6}>
+                      {kieKeyPaid === true ? 'Generate image from post content' : 'Add and verify your KIE API key in Automation Settings'}
+                    </TooltipContent>
                   </Tooltip>
                 )}
                 {!post.posted && (
@@ -693,7 +699,7 @@ const PostsActivity = () => {
                         variant="outline"
                         className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
                         onClick={() => handleGenerateVideo(post.id)}
-                        disabled={!!actionLoading}
+                        disabled={!!actionLoading || kieKeyPaid !== true}
                       >
                         {actionLoading === `video:${post.id}` ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -702,7 +708,9 @@ const PostsActivity = () => {
                         )}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={6}>Generate video from post content (text-to-video)</TooltipContent>
+                    <TooltipContent side="bottom" sideOffset={6}>
+                      {kieKeyPaid === true ? 'Generate video from post content (text-to-video)' : 'Add and verify your KIE API key in Automation Settings'}
+                    </TooltipContent>
                   </Tooltip>
                 )}
                 <Tooltip>
@@ -808,14 +816,18 @@ const PostsActivity = () => {
             </div>
             <div className="space-y-3 rounded-xl bg-[#f8fafc] p-3">
               <p className="text-xs font-medium text-[#334155]">After create</p>
+              {kieKeyPaid !== true && (
+                <p className="text-xs text-amber-600">Add and verify your KIE API key in Automation Settings to enable image and video generation.</p>
+              )}
               <div className="flex items-center gap-2">
                 <Checkbox
                   checked={newPost.generateImage}
                   onCheckedChange={(checked) =>
                     setNewPost({ ...newPost, generateImage: checked as boolean })
                   }
+                  disabled={kieKeyPaid !== true}
                 />
-                <Label className="text-sm cursor-pointer">Generate AI image from post content</Label>
+                <Label className={`text-sm ${kieKeyPaid !== true ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>Generate AI image from post content</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -823,8 +835,9 @@ const PostsActivity = () => {
                   onCheckedChange={(checked) =>
                     setNewPost({ ...newPost, generateVideo: checked as boolean })
                   }
+                  disabled={kieKeyPaid !== true}
                 />
-                <Label className="text-sm cursor-pointer">Generate AI video from post content (text-to-video)</Label>
+                <Label className={`text-sm ${kieKeyPaid !== true ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>Generate AI video from post content (text-to-video)</Label>
               </div>
             </div>
           </div>
@@ -1072,7 +1085,8 @@ const PostsActivity = () => {
                           variant="outline"
                           className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
                           onClick={() => handleGenerateImage(viewPost.id)}
-                          disabled={!!actionLoading}
+                          disabled={!!actionLoading || kieKeyPaid !== true}
+                          title={kieKeyPaid !== true ? 'Add and verify your KIE API key in Automation Settings' : undefined}
                         >
                           {actionLoading === `image:${viewPost.id}` ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1086,7 +1100,8 @@ const PostsActivity = () => {
                           variant="outline"
                           className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
                           onClick={() => handleRegenerateImage(viewPost.id)}
-                          disabled={!!actionLoading}
+                          disabled={!!actionLoading || kieKeyPaid !== true}
+                          title={kieKeyPaid !== true ? 'Add and verify your KIE API key in Automation Settings' : undefined}
                         >
                           {actionLoading === `image:${viewPost.id}` ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1100,8 +1115,8 @@ const PostsActivity = () => {
                         variant="outline"
                         className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
                         onClick={() => handleGenerateVideo(viewPost.id)}
-                        disabled={!!actionLoading}
-                        title={viewPost.video_url ? 'Regenerate video from post content' : 'Generate video from post content (text-to-video)'}
+                        disabled={!!actionLoading || kieKeyPaid !== true}
+                        title={kieKeyPaid !== true ? 'Add and verify your KIE API key in Automation Settings' : viewPost.video_url ? 'Regenerate video from post content' : 'Generate video from post content (text-to-video)'}
                       >
                         {actionLoading === `video:${viewPost.id}` ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />

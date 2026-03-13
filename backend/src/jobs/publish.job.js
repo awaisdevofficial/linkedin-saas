@@ -55,7 +55,10 @@ export async function runPublishJob() {
         for (let i = 0; i < Math.min(3, suggestedComments.length); i++) {
           try {
             // commentOnPost handles URN conversion internally (ugcPost → activity)
-            await linkedin.commentOnPost(credentials, postUrn, suggestedComments[i]);
+            const commentResult = await linkedin.commentOnPost(credentials, postUrn, suggestedComments[i]);
+            if (commentResult?.postUnavailable) {
+              logger.automation('publish_job_comment_post_unavailable', { userId, postId: post.id });
+            }
             await sleep(60000);
           } catch (e) {
             logger.automation('publish_job_comment_error', { userId, postId: post.id, error: e.message });

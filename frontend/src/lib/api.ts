@@ -69,6 +69,16 @@ export const apiCalls = {
       body: { postId, ...options },
     }),
 
+  validateKieKey: (token: string, apiKey: string) =>
+    api<{ valid: boolean; paid: boolean; credits: number; message?: string }>('/api/validate-kie-key', {
+      token,
+      method: 'POST',
+      body: { apiKey },
+    }),
+
+  getKieKeyStatus: (token: string) =>
+    api<{ hasKey: boolean; valid: boolean; paid: boolean; credits: number }>('/api/kie-key-status', { token }),
+
   regeneratePost: (token: string, postId: string) =>
     api<{ success: boolean; hook?: string; content?: string; hashtags?: string[] }>(
       '/api/regenerate-post',

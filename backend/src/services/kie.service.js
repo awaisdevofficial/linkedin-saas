@@ -8,6 +8,7 @@ import axios from 'axios';
 const KIE_BASE = 'https://api.kie.ai';
 const POLL_INTERVAL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 90; // ~6 min max
+const POLL_LOG_EVERY = 10; // log progress every N attempts
 
 function getHeaders(apiKey) {
   return {
@@ -18,11 +19,52 @@ function getHeaders(apiKey) {
 }
 
 /**
+ * Check KIE account credits. Returns { valid, credits } or { valid: false }.
+ * Used to validate API key and treat credits > 0 as "paid".
+ * @see https://docs.kie.ai/common-api/get-account-credits
+ */
+export async function getCredits(apiKey) {
+  if (!apiKey?.trim()) return { valid: false, credits: 0 };
+  try {
+    const { data } = await axios.get(
+      `${KIE_BASE}/api/v1/chat/credit`,
+      { headers: getHeaders(apiKey), timeout: 10000 }
+    );
+    if (data?.code === 200 && typeof data?.data === 'number') {
+      return { valid: true, credits: data.data };
+    }
+    if (data?.code === 401) return { valid: false, credits: 0 };
+    return { valid: false, credits: 0 };
+  } catch (e) {
+    const status = e.response?.status;
+    const code = e.response?.data?.code;
+    if (status === 401 || code === 401) return { valid: false, credits: 0 };
+    logKie('error', 'getCredits_error', { error: e.message, status, code: e.response?.data?.code });
+    return { valid: false, credits: 0 };
+  }
+}
+
+function logKie(level, msg, data = {}) {
+  const line = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    service: 'kie',
+    level,
+    message: msg,
+    ...data,
+  });
+  if (level === 'error') console.error(line);
+  else console.log(line);
+}
+
+/**
  * Poll task status until success or fail. Returns first result URL or null.
  */
 async function pollTaskResult(apiKey, taskId) {
   for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    if (i > 0 && i % POLL_LOG_EVERY === 0) {
+      logKie('info', 'kie_poll_progress', { taskId, attempt: i, maxAttempts: POLL_MAX_ATTEMPTS });
+    }
     try {
       const { data: res } = await axios.get(
         `${KIE_BASE}/api/v1/jobs/recordInfo`,

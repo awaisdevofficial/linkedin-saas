@@ -60,6 +60,9 @@ async function uploadImageAsset(credentials, mediaUrl) {
  * Upload video via LinkedIn Videos API (initializeUpload, upload parts, finalizeUpload).
  * Returns urn:li:video:xxx for use with /rest/posts.
  * Note: LinkedIn sometimes returns empty uploadToken; we still call finalize with it.
+ *
+ * LinkedIn video specs (for debugging): MP4 recommended; max file size ~200MB; max duration ~10min.
+ * Token must have w_member_social scope for UGC post with video.
  * @see https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/videos-api
  */
 async function uploadVideoAsset(credentials, videoUrl) {
@@ -75,23 +78,51 @@ async function uploadVideoAsset(credentials, videoUrl) {
   };
 
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_fetch_start', url: videoUrl?.slice(0, 80) }));
-  const videoRes = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 120000 });
-  const buffer = Buffer.from(videoRes.data);
-  const fileSizeBytes = buffer.length;
+  let fileSizeBytes = 0;
+  let buffer;
+  try {
+    const videoRes = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 120000 });
+    buffer = Buffer.from(videoRes.data);
+    fileSizeBytes = buffer.length;
+  } catch (e) {
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'linkedin',
+      action: 'video_fetch_failed',
+      error: e.message,
+      status: e.response?.status,
+      responseData: e.response?.data != null ? (typeof e.response.data === 'object' ? e.response.data : String(e.response.data).slice(0, 500)) : undefined,
+    }));
+    throw e;
+  }
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_fetch_done', fileSizeBytes }));
 
-  const initRes = await axios.post(
-    'https://api.linkedin.com/rest/videos?action=initializeUpload',
-    {
-      initializeUploadRequest: {
-        owner: personUrn,
-        fileSizeBytes,
-        uploadCaptions: false,
-        uploadThumbnail: false,
+  let initRes;
+  try {
+    initRes = await axios.post(
+      'https://api.linkedin.com/rest/videos?action=initializeUpload',
+      {
+        initializeUploadRequest: {
+          owner: personUrn,
+          fileSizeBytes,
+          uploadCaptions: false,
+          uploadThumbnail: false,
+        },
       },
-    },
-    { headers }
-  );
+      { headers }
+    );
+  } catch (e) {
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'linkedin',
+      action: 'video_initializeUpload_error',
+      fileSizeBytes,
+      status: e.response?.status,
+      responseData: e.response?.data != null ? (typeof e.response.data === 'object' ? e.response.data : String(e.response.data)) : undefined,
+      message: e.message,
+    }));
+    throw e;
+  }
 
   const value = initRes.data?.value;
   const videoUrn = value?.video;
@@ -99,7 +130,13 @@ async function uploadVideoAsset(credentials, videoUrl) {
   const instructions = value?.uploadInstructions || [];
 
   if (!videoUrn || !instructions.length) {
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_init_failed', response: initRes.data }));
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'linkedin',
+      action: 'video_init_failed',
+      fileSizeBytes,
+      fullResponse: initRes.data,
+    }));
     throw new Error(`Video initializeUpload failed: need video URN and uploadInstructions. Response: ${JSON.stringify(initRes.data)}`);
   }
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'video_init_ok', videoUrn, parts: instructions.length, hasToken: !!uploadToken }));
@@ -174,13 +211,14 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
       console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'postToLinkedIn_using_video' }));
       mediaUrn = await uploadVideoAsset(credentials, videoUrl.trim());
     } catch (e) {
-      const msg = e.response?.data ? JSON.stringify(e.response.data) : e.message;
       console.error(JSON.stringify({
         timestamp: new Date().toISOString(),
         service: 'linkedin',
         action: 'uploadVideoAsset_failed',
-        error: msg,
-        stack: e.stack?.slice(0, 300),
+        status: e.response?.status,
+        responseData: e.response?.data != null ? (typeof e.response.data === 'object' ? e.response.data : String(e.response.data)) : undefined,
+        message: e.message,
+        stack: e.stack?.slice(0, 500),
       }));
       throw e;
     }
@@ -265,6 +303,11 @@ export async function postToLinkedIn(credentials, { hook, content, hashtags, med
   }
 }
 
+/**
+ * Comment on a LinkedIn post. Returns comment id on success.
+ * On 404 (post deleted/unavailable/no permission), returns { postUnavailable: true } so callers
+ * can mark the post and avoid infinite retries.
+ */
 export async function commentOnPost(credentials, postUrn, commentText) {
   // v2/socialActions ONLY accepts activity URNs
   // Convert ugcPost or share URN to activity URN (same numeric ID, different prefix)
@@ -306,6 +349,7 @@ export async function commentOnPost(credentials, postUrn, commentText) {
     );
     return res.headers?.['x-restli-id'] || res.data?.id;
   } catch (e) {
+    const status = e.response?.status;
     const detail = e.response?.data
       ? JSON.stringify(e.response.data)
       : e.message;
@@ -316,9 +360,14 @@ export async function commentOnPost(credentials, postUrn, commentText) {
         action: 'commentOnPost',
         originalUrn: postUrn,
         resolvedUrn: urn,
+        status,
         error: detail,
       })
     );
+    // 404 = post not found / deleted / no permission to comment — treat as unavailable, do not retry
+    if (status === 404) {
+      return { postUnavailable: true };
+    }
     throw e;
   }
 }

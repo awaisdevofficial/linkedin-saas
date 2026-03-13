@@ -137,21 +137,37 @@ export async function runEngageJob() {
                 if (commentText?.trim()) {
                   // Use confirmed URN from like response if available, otherwise fall back to activityId
                   const urnToComment = item._confirmedActivityUrn || item.activity_id;
-                  await linkedin.commentOnPost(credentials, urnToComment, commentText.trim());
-                  await supabase.logEngagement(userId, {
-                    action: 'comment',
-                    post_uri: item.uri,
-                    activity_id: item.activity_id,
-                    comment_text: commentText.trim(),
-                    post_content: item.description ?? null,
-                    author_urn: item.author_urn || null,
-                    author_name: item.author_name || null,
-                    author_headline: item.author_headline || null,
-                    author_profile_url: item.author_profile_url || null,
-                    status: 'completed',
-                  });
-                  engaged++;
-                  logger.automation('engage_job_commented', { userId, activityId: item.activity_id, usedConfirmedUrn: !!item._confirmedActivityUrn });
+                  const commentResult = await linkedin.commentOnPost(credentials, urnToComment, commentText.trim());
+                  if (commentResult?.postUnavailable) {
+                    await supabase.logEngagement(userId, {
+                      action: 'comment',
+                      post_uri: item.uri,
+                      activity_id: item.activity_id,
+                      comment_text: commentText.trim(),
+                      post_content: item.description ?? null,
+                      author_urn: item.author_urn || null,
+                      author_name: item.author_name || null,
+                      author_headline: item.author_headline || null,
+                      author_profile_url: item.author_profile_url || null,
+                      status: 'post_unavailable',
+                    });
+                    logger.automation('engage_job_post_unavailable', { userId, activityId: item.activity_id });
+                  } else {
+                    await supabase.logEngagement(userId, {
+                      action: 'comment',
+                      post_uri: item.uri,
+                      activity_id: item.activity_id,
+                      comment_text: commentText.trim(),
+                      post_content: item.description ?? null,
+                      author_urn: item.author_urn || null,
+                      author_name: item.author_name || null,
+                      author_headline: item.author_headline || null,
+                      author_profile_url: item.author_profile_url || null,
+                      status: 'completed',
+                    });
+                    engaged++;
+                    logger.automation('engage_job_commented', { userId, activityId: item.activity_id, usedConfirmedUrn: !!item._confirmedActivityUrn });
+                  }
                 }
               }
             }

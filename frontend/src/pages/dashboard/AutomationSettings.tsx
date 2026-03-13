@@ -51,6 +51,7 @@ const AutomationSettings = () => {
   const [activeTab, setActiveTab] = useState('post');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [kieKeyPaid, setKieKeyPaid] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!supabase || !user) {
@@ -84,6 +85,11 @@ const AutomationSettings = () => {
     apiCalls.getGenerationPaused(accessToken).then((r) => setGenerationPaused(r.generation_paused)).catch(() => {});
   }, [accessToken]);
 
+  useEffect(() => {
+    if (!accessToken) return;
+    apiCalls.getKieKeyStatus(accessToken).then((r) => setKieKeyPaid(r.paid)).catch(() => setKieKeyPaid(false));
+  }, [accessToken, contentSettings?.kie_api_key]);
+
   const handlePauseGeneration = async (paused: boolean) => {
     if (!accessToken) return;
     setSaving('generation');
@@ -98,10 +104,26 @@ const AutomationSettings = () => {
     }
   };
 
+  const validateKieKeyIfPresent = async (): Promise<boolean> => {
+    const key = contentSettings?.kie_api_key?.trim();
+    if (!key || !accessToken) return true;
+    const res = await apiCalls.validateKieKey(accessToken, key);
+    if (!res.valid) {
+      toast.error(res.message || 'Invalid KIE API key. Check your key at https://kie.ai/api-key');
+      return false;
+    }
+    if (!res.paid) {
+      toast.error(res.message || 'Upgrade your plan or add credits to continue generation of images and videos.');
+      return false;
+    }
+    return true;
+  };
+
   const handleSaveContent = async () => {
     if (!supabase || !user || !contentSettings) return;
     setSaving('content');
     try {
+      if (!(await validateKieKeyIfPresent())) return;
       await supabase!.from('user_content_settings').upsert(
         {
           user_id: user.id,
@@ -111,6 +133,7 @@ const AutomationSettings = () => {
         { onConflict: 'user_id' }
       );
       toast.success('Content settings saved');
+      if (accessToken) apiCalls.getKieKeyStatus(accessToken).then((r) => setKieKeyPaid(r.paid)).catch(() => setKieKeyPaid(false));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed');
     } finally {
@@ -138,6 +161,7 @@ const AutomationSettings = () => {
     if (!supabase || !user) return;
     setSaving('all');
     try {
+      if (contentSettings && !(await validateKieKeyIfPresent())) return;
       if (contentSettings) {
         await supabase.from('user_content_settings').upsert(
           {
@@ -156,6 +180,7 @@ const AutomationSettings = () => {
       }
       await handleSaveEngage();
       toast.success('All settings saved');
+      if (accessToken) apiCalls.getKieKeyStatus(accessToken).then((r) => setKieKeyPaid(r.paid)).catch(() => setKieKeyPaid(false));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
@@ -333,12 +358,17 @@ const AutomationSettings = () => {
                 The image is generated from the post content; the video is also generated from the post content. In automation, whatever you provide below (post content or your custom captions) will be used for generation.
               </div>
               <Separator className="bg-[#e2e8f0]" />
+              {kieKeyPaid === false && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                  Add and verify a KIE API key with credits above to enable image and video generation.
+                </div>
+              )}
               <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
                 <Label className="text-sm font-medium text-[#334155] cursor-pointer">Auto-generate image for new posts</Label>
                 <Switch
                   checked={engageSettings?.auto_generate_image === true}
                   onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_generate_image: checked }))}
-                  disabled={!!saving}
+                  disabled={!!saving || kieKeyPaid !== true}
                 />
               </div>
               {/* Image caption mode — only shown when auto_generate_image is enabled */}
@@ -402,7 +432,7 @@ const AutomationSettings = () => {
                 <Switch
                   checked={engageSettings?.auto_generate_video === true}
                   onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_generate_video: checked }))}
-                  disabled={!!saving}
+                  disabled={!!saving || kieKeyPaid !== true}
                 />
               </div>
               {/* Video caption mode — only shown when auto_generate_video is enabled */}

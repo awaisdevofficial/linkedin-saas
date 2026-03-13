@@ -542,6 +542,68 @@ app.patch('/api/settings/generation-paused', async (req, res) => {
   }
 });
 
+// POST /api/validate-kie-key — validate KIE API key; only accept if valid and credits > 0 (paid)
+app.post('/api/validate-kie-key', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    await supabaseAdmin.auth.getUser(token);
+    const apiKey = req.body?.apiKey?.trim?.();
+    if (!apiKey) return res.status(400).json({ error: 'apiKey required', valid: false, paid: false });
+    const kieService = await import('./src/services/kie.service.js');
+    const { valid, credits } = await kieService.getCredits(apiKey);
+    if (!valid) {
+      return res.status(200).json({
+        valid: false,
+        paid: false,
+        credits: 0,
+        message: 'Invalid KIE API key. Check your key at https://kie.ai/api-key',
+      });
+    }
+    const paid = credits > 0;
+    if (!paid) {
+      return res.status(200).json({
+        valid: true,
+        paid: false,
+        credits: 0,
+        message: 'Upgrade your plan or add credits to continue generation of images and videos. Get credits at https://kie.ai/api-key',
+      });
+    }
+    return res.status(200).json({ valid: true, paid: true, credits, message: 'KIE API key is valid and has credits.' });
+  } catch (e) {
+    logger.api('validate_kie_key_error', { error: e.message });
+    return res.status(500).json({ error: e.message || 'Validation failed', valid: false, paid: false });
+  }
+});
+
+// GET /api/kie-key-status — return whether user has a valid paid KIE key (for disabling image/video UI)
+app.get('/api/kie-key-status', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const supabaseService = await import('./src/services/supabase.service.js');
+    const settings = await supabaseService.getUserContentSettings(user.id);
+    const apiKey = settings?.kie_api_key?.trim();
+    if (!apiKey) {
+      return res.status(200).json({ hasKey: false, valid: false, paid: false, credits: 0 });
+    }
+    const kieService = await import('./src/services/kie.service.js');
+    const { valid, credits } = await kieService.getCredits(apiKey);
+    const paid = valid && credits > 0;
+    return res.status(200).json({
+      hasKey: true,
+      valid,
+      paid,
+      credits: valid ? credits : 0,
+    });
+  } catch (e) {
+    logger.api('kie_key_status_error', { error: e.message });
+    return res.status(500).json({ hasKey: false, valid: false, paid: false, credits: 0 });
+  }
+});
+
 // POST /api/regenerate-image — regenerate image for a post
 app.post('/api/regenerate-image', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -582,15 +644,16 @@ app.post('/api/regenerate-image', async (req, res) => {
   }
 });
 
-// POST /api/generate-image-for-post — generate image via KIE (text-to-image, Flux-2)
+// POST /api/generate-image-for-post — generate image via KIE (text-to-image, Flux-2). Long-running: Nginx needs proxy_read_timeout 600s.
 app.post('/api/generate-image-for-post', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  const postId = req.body?.postId;
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
-    const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
+    logger.api('generate_image_for_post_start', { postId, userId: user.id });
     const supabaseService = await import('./src/services/supabase.service.js');
     const groqService = await import('./src/services/groq.service.js');
     const kieService = await import('./src/services/kie.service.js');
@@ -608,7 +671,9 @@ app.post('/api/generate-image-for-post', async (req, res) => {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     const prompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '');
     if (!prompt) return res.status(400).json({ error: 'Add a hook or content to the post to generate an image' });
+    logger.api('generate_image_for_post_kie_start', { postId });
     const imageUrl = await kieService.generateImage(apiKey, prompt, '16:9');
+    logger.api('generate_image_for_post_kie_done', { postId, hasImage: !!imageUrl });
     if (!imageUrl) {
       logger.api('generate_image_for_post_skipped', { postId, reason: 'no_image_url' });
       return res.status(503).json({
@@ -626,6 +691,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
       has_media: true,
       updated_at: new Date().toISOString(),
     });
+    logger.api('generate_image_for_post_success', { postId, media_url: mediaUrl?.slice(0, 60) });
     return res.status(200).json({ success: true, media_url: mediaUrl });
   } catch (e) {
     logger.api('generate_image_for_post_error', { postId: req.body?.postId, error: e.message });
@@ -633,15 +699,16 @@ app.post('/api/generate-image-for-post', async (req, res) => {
   }
 });
 
-// POST /api/generate-video-for-post — generate video via KIE (text-to-video, Kling 2.6; no image required)
+// POST /api/generate-video-for-post — generate video via KIE (text-to-video, Kling 2.6; no image required). Long-running: Nginx needs proxy_read_timeout 600s.
 app.post('/api/generate-video-for-post', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  const postId = req.body?.postId;
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
-    const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
+    logger.api('generate_video_for_post_start', { postId, userId: user.id });
     const supabaseService = await import('./src/services/supabase.service.js');
     const groqService = await import('./src/services/groq.service.js');
     const kieService = await import('./src/services/kie.service.js');
@@ -659,7 +726,9 @@ app.post('/api/generate-video-for-post', async (req, res) => {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     const videoPrompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || 'Professional, subtle motion suitable for LinkedIn.';
     const duration = req.body?.duration === '10' ? '10' : '5';
+    logger.api('generate_video_for_post_kie_start', { postId });
     const videoUrl = await kieService.generateVideo(apiKey, videoPrompt, duration, '16:9');
+    logger.api('generate_video_for_post_kie_done', { postId, hasVideo: !!videoUrl });
     if (!videoUrl) {
       return res.status(503).json({
         error: 'Video generation failed',
@@ -670,6 +739,7 @@ app.post('/api/generate-video-for-post', async (req, res) => {
     const uploadedVideoUrl = await imageService.uploadVideoFromUrl(user.id, videoUrl);
     if (!uploadedVideoUrl) return res.status(500).json({ error: 'Video upload failed' });
     await supabaseService.updatePost(postId, { video_url: uploadedVideoUrl, updated_at: new Date().toISOString() });
+    logger.api('generate_video_for_post_success', { postId, video_url: uploadedVideoUrl?.slice(0, 60) });
     return res.status(200).json({ success: true, video_url: uploadedVideoUrl });
   } catch (e) {
     logger.api('generate_video_for_post_error', { postId: req.body?.postId, error: e.message });
@@ -813,7 +883,10 @@ app.post('/api/publish-now', async (req, res) => {
       (async () => {
         for (let i = 0; i < Math.min(3, suggestedComments.length); i++) {
           try {
-            await linkedinService.commentOnPost(credentials, postUrn, suggestedComments[i]);
+            const commentResult = await linkedinService.commentOnPost(credentials, postUrn, suggestedComments[i]);
+            if (commentResult?.postUnavailable) {
+              logger.api('publish_now_comment_post_unavailable', { postId, postUrn });
+            }
             await sleep(60000);
           } catch (_) {}
         }
