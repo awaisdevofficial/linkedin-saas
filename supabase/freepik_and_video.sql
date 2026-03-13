@@ -1,11 +1,12 @@
--- Freepik API key (per user) and post video URL
--- Run in Supabase SQL Editor
+-- KIE API key (per user) and post video URL
+-- Run in Supabase SQL Editor. Get your key: https://kie.ai/api-key
+-- If you previously ran this file with freepik_api_key, run rename_freepik_to_kie_api_key.sql to migrate.
 
--- user_content_settings: store user's Freepik API key for image/video generation
+-- user_content_settings: store user's KIE API key for image/video generation
 ALTER TABLE public.user_content_settings
-ADD COLUMN IF NOT EXISTS freepik_api_key text;
+ADD COLUMN IF NOT EXISTS kie_api_key text;
 
--- posts: store generated video URL (from Freepik Kling etc.)
+-- posts: store generated video URL (from KIE Kling etc.)
 ALTER TABLE public.posts
 ADD COLUMN IF NOT EXISTS video_url text;
 

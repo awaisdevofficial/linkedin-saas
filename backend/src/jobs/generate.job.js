@@ -1,6 +1,6 @@
 import * as supabase from '../services/supabase.service.js';
 import * as groq from '../services/groq.service.js';
-import * as freepik from '../services/freepik.service.js';
+import * as kie from '../services/kie.service.js';
 import * as rss from '../services/rss.service.js';
 import * as imageService from '../services/image.service.js';
 import { logger } from '../utils/logger.js';
@@ -170,8 +170,8 @@ async function handleMediaGeneration(postId, userId, settings, result, errors) {
   if (!postId) return;
 
   const engageSettings = await supabase.getEngagementSettings(userId);
-  const freepikKey = settings?.freepik_api_key?.trim();
-  if (!freepikKey) return;
+  const kieKey = settings?.kie_api_key?.trim();
+  if (!kieKey) return;
 
   const shouldAutoImage = engageSettings?.auto_generate_image === true;
   const shouldAutoVideo = engageSettings?.auto_generate_video === true;
@@ -191,7 +191,7 @@ async function handleMediaGeneration(postId, userId, settings, result, errors) {
 
       if (imagePrompt) {
         logger.automation('generate_job_image_start', { userId, postId, captionMode: settings.image_caption_mode || 'content' });
-        const imageUrl = await freepik.generateImage(freepikKey, imagePrompt, 'widescreen_16_9');
+        const imageUrl = await kie.generateImage(kieKey, imagePrompt, '16:9');
         if (imageUrl) {
           const mediaUrl = await imageService.processAndUploadImage(userId, imageUrl);
           if (mediaUrl) {
@@ -214,50 +214,23 @@ async function handleMediaGeneration(postId, userId, settings, result, errors) {
 
   if (doVideo) {
     try {
-      let imageUrlForVideo = null;
-      const post = await supabase.getPostByIdAndUser(postId, userId);
-      if (post?.media_url) {
-        imageUrlForVideo = post.media_url;
-      } else {
-        const imagePrompt =
-          settings.image_caption_mode === 'custom' && settings.custom_image_caption?.trim()
-            ? settings.custom_image_caption.trim()
-            : groq.buildPromptFromPostContent(
-                result.headline_hook || result.hook || '',
-                result.post_copy || result.content || ''
-              ) || groq.buildImagePromptFromVisual(result.visual_prompt);
-        if (imagePrompt) {
-          logger.automation('generate_job_image_start', { userId, postId, reason: 'for_video' });
-          const imageUrl = await freepik.generateImage(freepikKey, imagePrompt, 'widescreen_16_9');
-          if (imageUrl) {
-            const mediaUrl = await imageService.processAndUploadImage(userId, imageUrl);
-            if (mediaUrl) {
-              await supabase.updatePost(postId, { media_url: mediaUrl, has_media: true, updated_at: new Date().toISOString() });
-              imageUrlForVideo = imageUrl;
-            }
-          }
-        }
-      }
-
-      if (imageUrlForVideo) {
-        const motionPrompt =
-          settings.video_caption_mode === 'custom' && settings.custom_video_caption?.trim()
-            ? settings.custom_video_caption.trim()
-            : groq.buildPromptFromPostContent(
-                result.headline_hook || result.hook || '',
-                result.post_copy || result.content || ''
-              ) || groq.buildImagePromptFromVisual(result.visual_prompt) || 'Subtle professional motion, suitable for LinkedIn.';
-        logger.automation('generate_job_video_start', { userId, postId, captionMode: settings.video_caption_mode || 'content' });
-        const videoUrl = await freepik.generateVideo(freepikKey, imageUrlForVideo, '5', motionPrompt);
-        if (videoUrl) {
-          const uploadedVideoUrl = await imageService.uploadVideoFromUrl(userId, videoUrl);
-          if (uploadedVideoUrl) {
-            await supabase.updatePost(postId, {
-              video_url: uploadedVideoUrl,
-              updated_at: new Date().toISOString(),
-            });
-            logger.automation('generate_job_video_attached', { userId, postId });
-          }
+      const videoPrompt =
+        settings.video_caption_mode === 'custom' && settings.custom_video_caption?.trim()
+          ? settings.custom_video_caption.trim()
+          : groq.buildPromptFromPostContent(
+              result.headline_hook || result.hook || '',
+              result.post_copy || result.content || ''
+            ) || groq.buildImagePromptFromVisual(result.visual_prompt) || 'Professional, subtle motion suitable for LinkedIn.';
+      logger.automation('generate_job_video_start', { userId, postId, captionMode: settings.video_caption_mode || 'content' });
+      const videoUrl = await kie.generateVideo(kieKey, videoPrompt, '5', '16:9');
+      if (videoUrl) {
+        const uploadedVideoUrl = await imageService.uploadVideoFromUrl(userId, videoUrl);
+        if (uploadedVideoUrl) {
+          await supabase.updatePost(postId, {
+            video_url: uploadedVideoUrl,
+            updated_at: new Date().toISOString(),
+          });
+          logger.automation('generate_job_video_attached', { userId, postId });
         }
       }
     } catch (vidErr) {

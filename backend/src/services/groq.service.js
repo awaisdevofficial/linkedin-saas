@@ -1,6 +1,6 @@
 /**
  * Text AI: posts, comments, replies, visual prompts = Groq only.
- * Images/video = Freepik (user API key) via freepik.service.js.
+ * Images/video = KIE (user API key) via kie.service.js.
  */
 import Groq from 'groq-sdk';
 
@@ -267,7 +267,7 @@ export async function generateVisualPromptFromPost(hook, content) {
   return JSON.parse(raw);
 }
 
-/** Build text prompt from visual_prompt for Freepik/image generation. */
+/** Build text prompt from visual_prompt for KIE/image generation. */
 export function buildImagePromptFromVisual(visualPrompt) {
   if (!visualPrompt || typeof visualPrompt !== 'object') return '';
   const v = visualPrompt;
@@ -276,7 +276,7 @@ export function buildImagePromptFromVisual(visualPrompt) {
 
 /**
  * Build prompt from post caption/content for image and video generation.
- * Used for Freepik image/video; images/videos are Freepik, text is Groq.
+ * Used for KIE image/video; images/videos are KIE, text is Groq.
  */
 export function buildPromptFromPostContent(hook, content) {
   const parts = [hook, content].filter(Boolean).map((s) => String(s).trim());

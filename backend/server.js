@@ -561,10 +561,10 @@ app.post('/api/regenerate-image', async (req, res) => {
     const prompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || groqService.buildImagePromptFromVisual(post.visual_prompt);
     if (!prompt) return res.status(400).json({ error: 'Add a hook or content to the post to generate an image' });
     const settings = await supabaseService.getUserContentSettings(user.id);
-    const apiKey = settings?.freepik_api_key?.trim();
-    if (!apiKey) return res.status(503).json({ error: 'Add your Freepik API key in Automation Settings.' });
-    const freepikService = await import('./src/services/freepik.service.js');
-    const imageUrl = await freepikService.generateImage(apiKey, prompt, 'widescreen_16_9');
+    const apiKey = settings?.kie_api_key?.trim();
+    if (!apiKey) return res.status(503).json({ error: 'Add your KIE API key in Automation Settings (https://kie.ai/api-key).' });
+    const kieService = await import('./src/services/kie.service.js');
+    const imageUrl = await kieService.generateImage(apiKey, prompt, '16:9');
     if (!imageUrl) return res.status(500).json({ error: 'Image generation failed' });
     const mediaUrl = await imageService.processAndUploadImage(user.id, imageUrl);
     if (!mediaUrl) return res.status(500).json({ error: 'Image upload failed' });
@@ -582,7 +582,7 @@ app.post('/api/regenerate-image', async (req, res) => {
   }
 });
 
-// POST /api/generate-image-for-post — generate image via Freepik (prompt = post caption/content)
+// POST /api/generate-image-for-post — generate image via KIE (text-to-image, Flux-2)
 app.post('/api/generate-image-for-post', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
@@ -593,28 +593,28 @@ app.post('/api/generate-image-for-post', async (req, res) => {
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
     const groqService = await import('./src/services/groq.service.js');
-    const freepikService = await import('./src/services/freepik.service.js');
+    const kieService = await import('./src/services/kie.service.js');
     const imageService = await import('./src/services/image.service.js');
     const settings = await supabaseService.getUserContentSettings(user.id);
-    const apiKey = settings?.freepik_api_key?.trim();
+    const apiKey = settings?.kie_api_key?.trim();
     if (!apiKey) {
       return res.status(503).json({
         error: 'Image generation not available',
-        code: 'FREEPIK_KEY_MISSING',
-        message: 'Add your Freepik API key in Automation Settings. Get one at https://www.freepik.com/api/image-generation',
+        code: 'KIE_KEY_MISSING',
+        message: 'Add your KIE API key in Automation Settings. Get one at https://kie.ai/api-key',
       });
     }
     const post = await supabaseService.getPostByIdAndUser(postId, user.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
     const prompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '');
     if (!prompt) return res.status(400).json({ error: 'Add a hook or content to the post to generate an image' });
-    const imageUrl = await freepikService.generateImage(apiKey, prompt, 'widescreen_16_9');
+    const imageUrl = await kieService.generateImage(apiKey, prompt, '16:9');
     if (!imageUrl) {
       logger.api('generate_image_for_post_skipped', { postId, reason: 'no_image_url' });
       return res.status(503).json({
         error: 'Image generation failed',
         code: 'IMAGE_SERVICE_UNAVAILABLE',
-        message: 'Freepik image generation failed. Check your API key and credits at https://www.freepik.com/developers/dashboard',
+        message: 'KIE image generation failed. Check your API key and credits at https://kie.ai',
       });
     }
     const mediaUrl = await imageService.processAndUploadImage(user.id, imageUrl);
@@ -633,7 +633,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
   }
 });
 
-// POST /api/generate-video-for-post — generate video from existing post image only (Freepik Kling v2)
+// POST /api/generate-video-for-post — generate video via KIE (text-to-video, Kling 2.6; no image required)
 app.post('/api/generate-video-for-post', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
@@ -644,34 +644,27 @@ app.post('/api/generate-video-for-post', async (req, res) => {
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
     const groqService = await import('./src/services/groq.service.js');
-    const freepikService = await import('./src/services/freepik.service.js');
+    const kieService = await import('./src/services/kie.service.js');
     const imageService = await import('./src/services/image.service.js');
     const settings = await supabaseService.getUserContentSettings(user.id);
-    const apiKey = settings?.freepik_api_key?.trim();
+    const apiKey = settings?.kie_api_key?.trim();
     if (!apiKey) {
       return res.status(503).json({
         error: 'Video generation not available',
-        code: 'FREEPIK_KEY_MISSING',
-        message: 'Add your Freepik API key in Automation Settings. Get one at https://www.freepik.com/api/image-generation',
+        code: 'KIE_KEY_MISSING',
+        message: 'Add your KIE API key in Automation Settings. Get one at https://kie.ai/api-key',
       });
     }
     const post = await supabaseService.getPostByIdAndUser(postId, user.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
-    if (!post.media_url) {
-      return res.status(400).json({
-        error: 'Post must have an image first',
-        code: 'IMAGE_REQUIRED',
-        message: 'Generate an image for this post first, then you can generate video.',
-      });
-    }
+    const videoPrompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || 'Professional, subtle motion suitable for LinkedIn.';
     const duration = req.body?.duration === '10' ? '10' : '5';
-    const motionPrompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || 'Subtle professional motion, suitable for LinkedIn.';
-    const videoUrl = await freepikService.generateVideo(apiKey, post.media_url, duration, motionPrompt);
+    const videoUrl = await kieService.generateVideo(apiKey, videoPrompt, duration, '16:9');
     if (!videoUrl) {
       return res.status(503).json({
         error: 'Video generation failed',
         code: 'VIDEO_SERVICE_UNAVAILABLE',
-        message: 'Freepik video generation failed. Check your API key and credits.',
+        message: 'KIE video generation failed. Check your API key and credits at https://kie.ai',
       });
     }
     const uploadedVideoUrl = await imageService.uploadVideoFromUrl(user.id, videoUrl);
@@ -769,27 +762,27 @@ app.post('/api/publish-now', async (req, res) => {
     if (!credentials.personUrn) {
       return res.status(400).json({ error: 'LinkedIn person URN missing; reconnect in Settings' });
     }
-    // If no media yet, try generating it now (Freepik)
+    // If no media yet, try generating it now (KIE text-to-image)
     if (!post.media_url && (post.hook || post.content || post.visual_prompt)) {
       try {
         const contentSettings = await supabaseService.getUserContentSettings(user.id);
-        const freepikKey = contentSettings?.freepik_api_key?.trim();
-        if (freepikKey) {
+        const kieKey = contentSettings?.kie_api_key?.trim();
+        if (kieKey) {
           const groqService = await import('./src/services/groq.service.js');
-          const freepikService = await import('./src/services/freepik.service.js');
+          const kieService = await import('./src/services/kie.service.js');
           const { processAndUploadImage } = await import('./src/services/image.service.js');
           const prompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || groqService.buildImagePromptFromVisual(post.visual_prompt);
           if (!prompt) {
             logger.api('publish_now_image_skipped', { postId, reason: 'no_prompt' });
           } else {
-          const imageUrl = await freepikService.generateImage(freepikKey, prompt, 'widescreen_16_9');
-          if (imageUrl) {
-            const mediaUrl = await processAndUploadImage(user.id, imageUrl);
-            if (mediaUrl) {
-              await supabaseService.updatePost(postId, { media_url: mediaUrl });
-              post.media_url = mediaUrl;
+            const imageUrl = await kieService.generateImage(kieKey, prompt, '16:9');
+            if (imageUrl) {
+              const mediaUrl = await processAndUploadImage(user.id, imageUrl);
+              if (mediaUrl) {
+                await supabaseService.updatePost(postId, { media_url: mediaUrl });
+                post.media_url = mediaUrl;
+              }
             }
-          }
           }
         }
       } catch (imgErr) {

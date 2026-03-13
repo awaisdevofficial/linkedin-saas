@@ -39,7 +39,7 @@ const AutomationSettings = () => {
     custom_comment_prompt?: string;
     custom_reply_prompt?: string;
     enable_post_comment?: boolean;
-    freepik_api_key?: string;
+    kie_api_key?: string;
     generation_mode?: string;
     custom_generation_prompt?: string;
     image_caption_mode?: string;
@@ -309,20 +309,20 @@ const AutomationSettings = () => {
               </div>
               <Separator className="bg-[#e2e8f0]" />
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-[#334155]">Freepik API key (image & video generation)</Label>
+                <Label className="text-sm font-medium text-[#334155]">KIE API key (image & video generation)</Label>
                 <p className="text-xs text-[#64748b]">
-                  Your key is stored securely and used only for generating post images and videos. Get one at{' '}
-                  <a href="https://www.freepik.com/api/image-generation" target="_blank" rel="noopener noreferrer" className="text-[#2D5AF6] hover:underline">
-                    Freepik API
+                  Your key is stored securely and used only for generating post images and videos (text-to-image, text-to-video). Get one at{' '}
+                  <a href="https://kie.ai/api-key" target="_blank" rel="noopener noreferrer" className="text-[#2D5AF6] hover:underline">
+                    kie.ai/api-key
                   </a>
                   .
                 </p>
                 <Input
                   type="password"
                   autoComplete="off"
-                  value={contentSettings?.freepik_api_key || ''}
-                  onChange={(e) => setContentSettings((s) => ({ ...(s || {}), freepik_api_key: e.target.value }))}
-                  placeholder="Paste your Freepik API key"
+                  value={contentSettings?.kie_api_key || ''}
+                  onChange={(e) => setContentSettings((s) => ({ ...(s || {}), kie_api_key: e.target.value }))}
+                  placeholder="Paste your KIE API key"
                   className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] font-mono text-sm"
                 />
               </div>
@@ -391,7 +391,7 @@ const AutomationSettings = () => {
                         className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] resize-none text-sm"
                       />
                       <p className="text-xs text-[#64748b]">
-                        This exact text will be sent to Freepik as the image prompt
+                        This exact text will be sent to KIE as the image prompt
                       </p>
                     </div>
                   )}
@@ -455,7 +455,7 @@ const AutomationSettings = () => {
                         className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] resize-none text-sm"
                       />
                       <p className="text-xs text-[#64748b]">
-                        This exact text will be sent to Freepik as the video prompt
+                        This exact text will be sent to KIE as the video prompt
                       </p>
                     </div>
                   )}

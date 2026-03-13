@@ -94,6 +94,7 @@ const PostsActivity = () => {
     content: '',
     hashtags: '',
     generateImage: false,
+    generateVideo: false,
   });
 
   useEffect(() => {
@@ -363,20 +364,53 @@ const PostsActivity = () => {
   const handleCreatePost = async () => {
     if (!supabase || !user) return;
     const tags = newPost.hashtags ? newPost.hashtags.split(/\s+/).filter(Boolean) : [];
-    const { error } = await supabase.from('posts').insert({
-      user_id: user.id,
-      hook: newPost.hook,
-      content: newPost.content,
-      hashtags: tags,
-      status: 'pending',
-    });
+    const { data: inserted, error } = await supabase
+      .from('posts')
+      .insert({
+        user_id: user.id,
+        hook: newPost.hook,
+        content: newPost.content,
+        hashtags: tags,
+        status: 'pending',
+      })
+      .select('id, hook, content, hashtags, status, posted, media_url, video_url, publish_with_video, created_at, scheduled_at')
+      .single();
     if (error) {
       toast.error(error.message);
       return;
     }
-    setNewPost({ hook: '', content: '', hashtags: '', generateImage: false });
+    const newRow = inserted as Post;
+    const postId = newRow.id;
+    const doImage = newPost.generateImage;
+    const doVideo = newPost.generateVideo;
+    setNewPost({ hook: '', content: '', hashtags: '', generateImage: false, generateVideo: false });
     setIsNewPostDialogOpen(false);
+    setPosts((prev) => [newRow, ...prev]);
     toast.success('Post created');
+    if (postId && accessToken && (doImage || doVideo)) {
+      (async () => {
+        try {
+          if (doImage) {
+            const res = await apiCalls.generateImageForPost(accessToken, postId);
+            if (res?.media_url) {
+              setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, media_url: res.media_url! } : p)));
+              toast.success('Image generated from post content');
+            }
+          }
+          if (doVideo) {
+            const res = await apiCalls.generateVideoForPost(accessToken, postId);
+            if (res?.video_url) {
+              setPosts((prev) =>
+                prev.map((p) => (p.id === postId ? { ...p, video_url: res.video_url! } : p))
+              );
+              toast.success('Video generated from post content');
+            }
+          }
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Generation failed');
+        }
+      })();
+    }
   };
 
   const handleUpdatePost = async () => {
@@ -659,7 +693,7 @@ const PostsActivity = () => {
                         variant="outline"
                         className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
                         onClick={() => handleGenerateVideo(post.id)}
-                        disabled={!!actionLoading || !post.media_url}
+                        disabled={!!actionLoading}
                       >
                         {actionLoading === `video:${post.id}` ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -668,9 +702,7 @@ const PostsActivity = () => {
                         )}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={6}>
-                      {post.media_url ? 'Generate video from post content' : 'Generate an image first'}
-                    </TooltipContent>
+                    <TooltipContent side="bottom" sideOffset={6}>Generate video from post content (text-to-video)</TooltipContent>
                   </Tooltip>
                 )}
                 <Tooltip>
@@ -746,6 +778,9 @@ const PostsActivity = () => {
             <DialogTitle>Create New Post</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <p className="text-xs text-[#6B7098]">
+              Images and videos are generated from your hook and content below.
+            </p>
             <div className="space-y-2">
               <Label>Hook</Label>
               <Input
@@ -771,14 +806,26 @@ const PostsActivity = () => {
                 placeholder="#hashtag #hashtag2"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={newPost.generateImage}
-                onCheckedChange={(checked) =>
-                  setNewPost({ ...newPost, generateImage: checked as boolean })
-                }
-              />
-              <Label className="text-sm">Generate AI image (after create)</Label>
+            <div className="space-y-3 rounded-xl bg-[#f8fafc] p-3">
+              <p className="text-xs font-medium text-[#334155]">After create</p>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={newPost.generateImage}
+                  onCheckedChange={(checked) =>
+                    setNewPost({ ...newPost, generateImage: checked as boolean })
+                  }
+                />
+                <Label className="text-sm cursor-pointer">Generate AI image from post content</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={newPost.generateVideo}
+                  onCheckedChange={(checked) =>
+                    setNewPost({ ...newPost, generateVideo: checked as boolean })
+                  }
+                />
+                <Label className="text-sm cursor-pointer">Generate AI video from post content (text-to-video)</Label>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -1053,8 +1100,8 @@ const PostsActivity = () => {
                         variant="outline"
                         className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
                         onClick={() => handleGenerateVideo(viewPost.id)}
-                        disabled={!!actionLoading || !viewPost.media_url}
-                        title={!viewPost.media_url ? 'Generate an image first' : (viewPost.video_url ? 'Regenerate video from post content' : 'Generate video from post content')}
+                        disabled={!!actionLoading}
+                        title={viewPost.video_url ? 'Regenerate video from post content' : 'Generate video from post content (text-to-video)'}
                       >
                         {actionLoading === `video:${viewPost.id}` ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
