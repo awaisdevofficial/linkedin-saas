@@ -63,7 +63,7 @@ export const apiCalls = {
     }),
 
   generateVideoForPost: (token: string, postId: string, options?: { duration?: '5' | '10'; prompt?: string }) =>
-    api<{ success: boolean; video_url?: string }>('/api/generate-video-for-post', {
+    api<{ success: boolean; video_url?: string; media_url?: string }>('/api/generate-video-for-post', {
       token,
       method: 'POST',
       body: { postId, ...options },

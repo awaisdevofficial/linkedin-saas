@@ -633,7 +633,7 @@ app.post('/api/generate-image-for-post', async (req, res) => {
   }
 });
 
-// POST /api/generate-video-for-post — generate video from post image via Freepik Kling v2 (prompt = post caption/content)
+// POST /api/generate-video-for-post — generate video (from post image or generate image first) via Freepik Kling v2
 app.post('/api/generate-video-for-post', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
@@ -655,15 +655,32 @@ app.post('/api/generate-video-for-post', async (req, res) => {
         message: 'Add your Freepik API key in Automation Settings. Get one at https://www.freepik.com/api/image-generation',
       });
     }
-    const post = await supabaseService.getPostByIdAndUser(postId, user.id);
+    let post = await supabaseService.getPostByIdAndUser(postId, user.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
-    const imageUrl = post.media_url;
-    if (!imageUrl) {
-      return res.status(400).json({ error: 'Post must have an image first. Generate an image, then generate video.' });
+    let imageUrlForVideo = post.media_url;
+    if (!imageUrlForVideo) {
+      const prompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || groqService.buildImagePromptFromVisual(post.visual_prompt);
+      if (!prompt) {
+        return res.status(400).json({ error: 'Add a hook or content to the post to generate video' });
+      }
+      const imageUrlFromFreepik = await freepikService.generateImage(apiKey, prompt, 'widescreen_16_9');
+      if (!imageUrlFromFreepik) {
+        return res.status(503).json({
+          error: 'Image generation failed (needed for video)',
+          code: 'IMAGE_SERVICE_UNAVAILABLE',
+          message: 'Could not create image for video. Check your Freepik API key and credits.',
+        });
+      }
+      const mediaUrl = await imageService.processAndUploadImage(user.id, imageUrlFromFreepik);
+      if (mediaUrl) {
+        await supabaseService.updatePost(postId, { media_url: mediaUrl, updated_at: new Date().toISOString() });
+        post = { ...post, media_url: mediaUrl };
+      }
+      imageUrlForVideo = imageUrlFromFreepik;
     }
     const duration = req.body?.duration === '10' ? '10' : '5';
     const motionPrompt = groqService.buildPromptFromPostContent(post.hook || '', post.content || '') || 'Subtle professional motion, suitable for LinkedIn.';
-    const videoUrl = await freepikService.generateVideo(apiKey, imageUrl, duration, motionPrompt);
+    const videoUrl = await freepikService.generateVideo(apiKey, imageUrlForVideo, duration, motionPrompt);
     if (!videoUrl) {
       return res.status(503).json({
         error: 'Video generation failed',
@@ -674,7 +691,9 @@ app.post('/api/generate-video-for-post', async (req, res) => {
     const uploadedVideoUrl = await imageService.uploadVideoFromUrl(user.id, videoUrl);
     if (!uploadedVideoUrl) return res.status(500).json({ error: 'Video upload failed' });
     await supabaseService.updatePost(postId, { video_url: uploadedVideoUrl, updated_at: new Date().toISOString() });
-    return res.status(200).json({ success: true, video_url: uploadedVideoUrl });
+    const payload = { success: true, video_url: uploadedVideoUrl };
+    if (post.media_url) payload.media_url = post.media_url;
+    return res.status(200).json(payload);
   } catch (e) {
     logger.api('generate_video_for_post_error', { postId: req.body?.postId, error: e.message });
     return res.status(500).json({ error: e.message || 'Generate video for post failed' });

@@ -247,8 +247,9 @@ const PostsActivity = () => {
     try {
       const res = await apiCalls.generateVideoForPost(accessToken, postId);
       if (res.video_url) {
-        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, video_url: res.video_url! } : p)));
-        if (viewPost?.id === postId) setViewPost((prev) => (prev ? { ...prev, video_url: res.video_url! } : null));
+        const updates = { video_url: res.video_url, ...(res.media_url && { media_url: res.media_url }) };
+        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, ...updates } : p)));
+        if (viewPost?.id === postId) setViewPost((prev) => (prev ? { ...prev, ...updates } : null));
         toast.success('Video generated and uploaded');
       } else {
         toast.success('Video generation started');
@@ -656,9 +657,9 @@ const PostsActivity = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
-                        onClick={() => post.media_url && handleGenerateVideo(post.id)}
-                        disabled={!!actionLoading || !post.media_url}
+                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                        onClick={() => handleGenerateVideo(post.id)}
+                        disabled={!!actionLoading}
                       >
                         {actionLoading === `video:${post.id}` ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -668,7 +669,7 @@ const PostsActivity = () => {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" sideOffset={6}>
-                      {post.media_url ? 'Generate video from image' : 'Generate an image first'}
+                      Generate video (image created automatically if needed)
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -1050,10 +1051,10 @@ const PostsActivity = () => {
                       )}
                       <Button
                         variant="outline"
-                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
-                        onClick={() => viewPost.media_url && handleGenerateVideo(viewPost.id)}
-                        disabled={!!actionLoading || !viewPost.media_url}
-                        title={viewPost.media_url ? (viewPost.video_url ? 'Regenerate video' : 'Generate video') : 'Generate an image first'}
+                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                        onClick={() => handleGenerateVideo(viewPost.id)}
+                        disabled={!!actionLoading}
+                        title={viewPost.video_url ? 'Regenerate video' : 'Generate video (image created automatically if needed)'}
                       >
                         {actionLoading === `video:${viewPost.id}` ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
