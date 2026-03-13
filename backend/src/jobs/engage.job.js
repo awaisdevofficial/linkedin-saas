@@ -70,34 +70,78 @@ export async function runEngageJob() {
 
           try {
             if (settings.auto_liking) {
-              const likeResult = await linkedin.likePost(credentials, item.activity_id);
-              await supabase.logEngagement(userId, {
-                action: 'like',
-                post_uri: item.uri,
-                activity_id: item.activity_id,
-                post_content: item.description ?? null,
-                status: likeResult?.skipped ? 'skipped' : 'completed',
-              });
-              if (!likeResult?.error) engaged++;
-              await new Promise((r) => setTimeout(r, intervalMs));
+              const alreadyLiked = await supabase.hasEngaged(userId, item.activity_id, 'like');
+              if (!alreadyLiked) {
+                const likeResult = await linkedin.likePost(credentials, item.activity_id);
+                if (!likeResult?.error && !likeResult?.skipped) {
+                  // Store the confirmed activity URN from like response for use in commenting
+                  if (likeResult?.confirmedUrn) {
+                    item._confirmedActivityUrn = likeResult.confirmedUrn;
+                  }
+                  await supabase.logEngagement(userId, {
+                    action: 'like',
+                    post_uri: item.uri,
+                    activity_id: item.activity_id,
+                    post_content: item.description ?? null,
+                    author_urn: item.author_urn || null,
+                    author_name: item.author_name || null,
+                    author_headline: item.author_headline || null,
+                    author_profile_url: item.author_profile_url || null,
+                    status: 'completed',
+                  });
+                  engaged++;
+                  logger.automation('engage_job_liked', { userId, activityId: item.activity_id });
+                } else if (likeResult?.skipped) {
+                  await supabase.logEngagement(userId, {
+                    action: 'like',
+                    post_uri: item.uri,
+                    activity_id: item.activity_id,
+                    post_content: item.description ?? null,
+                    author_urn: item.author_urn || null,
+                    author_name: item.author_name || null,
+                    author_headline: item.author_headline || null,
+                    author_profile_url: item.author_profile_url || null,
+                    status: 'skipped',
+                  });
+                }
+              }
             }
 
             if (settings.auto_commenting) {
-              const userSettings = await supabase.getUserContentSettings(userId);
-              const template = await supabase.getPromptTemplate('comment', userSettings.niche || 'all');
-              const builtPrompt = template ? promptService.buildCommentPrompt(userSettings, template.prompt) : 'Generate a short professional LinkedIn comment (max 15 words). Return only the comment.';
-              const commentText = await openai.generateComment(item.description, builtPrompt);
-              await linkedin.commentOnPost(credentials, item.uri, commentText);
-              await supabase.logEngagement(userId, {
-                action: 'comment',
-                post_uri: item.uri,
-                activity_id: item.activity_id,
-                comment_text: commentText,
-                post_content: item.description ?? null,
-                status: 'completed',
-              });
-              engaged++;
-              await new Promise((r) => setTimeout(r, intervalMs));
+              const alreadyCommented = await supabase.hasEngaged(userId, item.activity_id, 'comment');
+              if (!alreadyCommented) {
+                const userSettings = await supabase.getUserContentSettings(userId);
+                const niche = userSettings?.niche || 'all';
+
+                let builtPrompt = settings.comment_prompt?.trim();
+                if (!builtPrompt) {
+                  const template = await supabase.getPromptTemplate('comment', niche);
+                  builtPrompt = template
+                    ? promptService.buildCommentPrompt(userSettings, template.prompt)
+                    : 'Write a short, genuine, professional LinkedIn comment (max 15 words). No emojis. No hashtags. Return only the comment text.';
+                }
+
+                const commentText = await openai.generateComment(item.description, builtPrompt);
+                if (commentText?.trim()) {
+                  // Use confirmed URN from like response if available, otherwise fall back to activityId
+                  const urnToComment = item._confirmedActivityUrn || item.activity_id;
+                  await linkedin.commentOnPost(credentials, urnToComment, commentText.trim());
+                  await supabase.logEngagement(userId, {
+                    action: 'comment',
+                    post_uri: item.uri,
+                    activity_id: item.activity_id,
+                    comment_text: commentText.trim(),
+                    post_content: item.description ?? null,
+                    author_urn: item.author_urn || null,
+                    author_name: item.author_name || null,
+                    author_headline: item.author_headline || null,
+                    author_profile_url: item.author_profile_url || null,
+                    status: 'completed',
+                  });
+                  engaged++;
+                  logger.automation('engage_job_commented', { userId, activityId: item.activity_id, usedConfirmedUrn: !!item._confirmedActivityUrn });
+                }
+              }
             }
           } catch (e) {
             logger.automation('engage_job_item_error', { userId, postUri: item.uri, error: e.message });

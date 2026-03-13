@@ -25,23 +25,80 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
       return { usersProcessed: 0, postsCreated: 0, errors: [] };
     }
 
+    // ── CUSTOM MODE: each user with generation_mode='custom' runs independently ──
+    // ── AUTO MODE: group by niche to share RSS fetch ─────────────────────────────
+    const customUsers = [];
     const nicheGroups = new Map();
+
     for (const user of users) {
       try {
         const settings = await supabase.getUserContentSettings(user.user_id);
         if (settings.generation_paused && !forceGenerate) {
-          logger.automation('generate_job_user_skipped', { userId: user.user_id, reason: 'generation_paused' });
+          logger.automation('generate_job_user_skipped', {
+            userId: user.user_id,
+            reason: 'generation_paused',
+          });
           continue;
         }
-        const niche = settings.niche || 'tech';
-        if (!nicheGroups.has(niche)) nicheGroups.set(niche, []);
-        nicheGroups.get(niche).push({ user, settings });
+
+        const mode = settings.generation_mode || 'auto';
+        if (mode === 'custom') {
+          customUsers.push({ user, settings });
+        } else {
+          const niche = settings.niche || 'tech';
+          if (!nicheGroups.has(niche)) nicheGroups.set(niche, []);
+          nicheGroups.get(niche).push({ user, settings });
+        }
       } catch (e) {
         logger.automation('generate_job_user_error', { userId: user.user_id, error: e.message });
         errors.push({ userId: user.user_id, error: e.message });
       }
     }
 
+    // ── PROCESS CUSTOM MODE USERS ─────────────────────────────────────────────
+    for (const { user, settings } of customUsers) {
+      const userId = user.user_id;
+      try {
+        const customPrompt = settings.custom_generation_prompt?.trim();
+        if (!customPrompt) {
+          logger.automation('generate_job_custom_skip', { userId, reason: 'no_custom_prompt' });
+          continue;
+        }
+
+        logger.automation('generate_job_custom_mode', { userId });
+
+        // Use the custom prompt directly — no RSS, no niche lookup
+        const result = await openai.generatePostFromCustomPrompt(customPrompt, settings);
+        if (!result) continue;
+
+        const postId = await supabase.createPost(userId, {
+          hook: result.headline_hook || result.hook || '',
+          content: result.post_copy || result.content || '',
+          hashtags: result.hashtags || [],
+          hashtags_raw: result.hashtags || [],
+          suggested_comments: result.suggested_comments || [],
+          visual_prompt: result.visual_prompt || null,
+          status: 'pending',
+          posted: false,
+        });
+
+        if (postId) {
+          postsCreated++;
+          logger.automation('generate_job_post_created', { userId, postId, mode: 'custom' });
+        }
+
+        // Auto-generate image/video based on settings
+        await handleMediaGeneration(postId, userId, settings, result, errors);
+
+        usersProcessed++;
+        await sleep(2000);
+      } catch (e) {
+        logger.automation('generate_job_post_error', { userId, mode: 'custom', error: e.message });
+        errors.push({ userId, action: 'generatePost_custom', error: e.message });
+      }
+    }
+
+    // ── PROCESS AUTO MODE USERS (grouped by niche) ────────────────────────────
     for (const [niche, group] of nicheGroups) {
       if (!group.length) continue;
       const first = group[0];
@@ -58,6 +115,7 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
         errors.push({ niche, error: e.message });
         continue;
       }
+
       const topArticles = (articles || []).slice(0, 1);
       logger.automation('generate_job_articles', { niche, articleCount: topArticles.length });
       if (!topArticles.length) continue;
@@ -68,6 +126,7 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
           try {
             const result = await openai.generatePost(article, settings);
             if (!result) continue;
+
             const postId = await supabase.createPost(userId, {
               hook: result.headline_hook || result.hook || '',
               content: result.post_copy || result.content || '',
@@ -78,34 +137,14 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
               status: 'pending',
               posted: false,
             });
+
             if (postId) {
               postsCreated++;
-              logger.automation('generate_job_post_created', { userId, postId });
+              logger.automation('generate_job_post_created', { userId, postId, mode: 'auto' });
             }
 
-            // Auto-generate image only (no video). Prompt = post caption/content.
-            const imagePrompt = openai.buildPromptFromPostContent(result.headline_hook || result.hook || '', result.post_copy || result.content || '') || openai.buildImagePromptFromVisual(result.visual_prompt);
-            if (postId && imagePrompt && settings?.freepik_api_key?.trim()) {
-              try {
-                const prompt = imagePrompt;
-                const imageUrl = await freepik.generateImage(settings.freepik_api_key.trim(), prompt, 'widescreen_16_9');
-                if (imageUrl) {
-                  const mediaUrl = await imageService.processAndUploadImage(userId, imageUrl);
-                  if (mediaUrl) {
-                    await supabase.updatePost(postId, {
-                      media_url: mediaUrl,
-                      has_media: true,
-                      is_checked: true,
-                      updated_at: new Date().toISOString(),
-                    });
-                  }
-                }
-              } catch (imgErr) {
-                logger.automation('generate_job_image_error', { userId, postId, error: imgErr.message });
-                errors.push({ userId, postId, action: 'generateImage', error: imgErr.message });
-              }
-              await sleep(3000);
-            }
+            // Auto-generate image/video based on settings
+            await handleMediaGeneration(postId, userId, settings, result, errors);
 
             usersProcessed++;
             await sleep(2000);
@@ -122,5 +161,88 @@ export async function runGenerateJob(optionUserId = null, options = {}) {
   } catch (e) {
     logger.automation('generate_job_fatal', { error: e.message });
     return { usersProcessed, postsCreated, errors: [...errors, { error: e.message }] };
+  }
+}
+
+// ── MEDIA GENERATION HELPER ───────────────────────────────────────────────────
+// Handles auto_generate_image / auto_generate_video with caption mode support
+async function handleMediaGeneration(postId, userId, settings, result, errors) {
+  if (!postId) return;
+
+  const engageSettings = await supabase.getEngagementSettings(userId);
+  const freepikKey = settings?.freepik_api_key?.trim();
+  if (!freepikKey) return;
+
+  const shouldAutoImage = engageSettings?.auto_generate_image === true;
+  const shouldAutoVideo = engageSettings?.auto_generate_video === true;
+
+  // Mutually exclusive — image wins
+  const doImage = shouldAutoImage;
+  const doVideo = !doImage && shouldAutoVideo;
+
+  if (doImage) {
+    try {
+      // Caption mode: 'custom' uses user's custom_image_caption
+      //               'content' (default) builds from post text
+      const imagePrompt =
+        settings.image_caption_mode === 'custom' && settings.custom_image_caption?.trim()
+          ? settings.custom_image_caption.trim()
+          : openai.buildPromptFromPostContent(
+              result.headline_hook || result.hook || '',
+              result.post_copy || result.content || ''
+            ) || openai.buildImagePromptFromVisual(result.visual_prompt);
+
+      if (imagePrompt) {
+        logger.automation('generate_job_image_start', { userId, postId, captionMode: settings.image_caption_mode || 'content' });
+        const imageUrl = await freepik.generateImage(freepikKey, imagePrompt, 'widescreen_16_9');
+        if (imageUrl) {
+          const mediaUrl = await imageService.processAndUploadImage(userId, imageUrl);
+          if (mediaUrl) {
+            await supabase.updatePost(postId, {
+              media_url: mediaUrl,
+              video_url: null,
+              has_media: true,
+              updated_at: new Date().toISOString(),
+            });
+            logger.automation('generate_job_image_attached', { userId, postId });
+          }
+        }
+      }
+    } catch (imgErr) {
+      logger.automation('generate_job_image_error', { userId, postId, error: imgErr.message });
+      errors.push({ userId, postId, action: 'generateImage', error: imgErr.message });
+    }
+    await sleep(3000);
+  }
+
+  if (doVideo) {
+    try {
+      // Caption mode: 'custom' uses user's custom_video_caption
+      //               'content' (default) builds from post text
+      const videoPrompt =
+        settings.video_caption_mode === 'custom' && settings.custom_video_caption?.trim()
+          ? settings.custom_video_caption.trim()
+          : openai.buildPromptFromPostContent(
+              result.headline_hook || result.hook || '',
+              result.post_copy || result.content || ''
+            ) || openai.buildImagePromptFromVisual(result.visual_prompt);
+
+      if (videoPrompt) {
+        logger.automation('generate_job_video_start', { userId, postId, captionMode: settings.video_caption_mode || 'content' });
+        const videoUrl = await freepik.generateVideo(freepikKey, videoPrompt);
+        if (videoUrl) {
+          await supabase.updatePost(postId, {
+            video_url: videoUrl,
+            media_url: null,
+            updated_at: new Date().toISOString(),
+          });
+          logger.automation('generate_job_video_attached', { userId, postId });
+        }
+      }
+    } catch (vidErr) {
+      logger.automation('generate_job_video_error', { userId, postId, error: vidErr.message });
+      errors.push({ userId, postId, action: 'generateVideo', error: vidErr.message });
+    }
+    await sleep(3000);
   }
 }

@@ -4,7 +4,7 @@ import * as openai from '../services/openai.service.js';
 import * as linkedin from '../services/linkedin.service.js';
 import { logger } from '../utils/logger.js';
 
-const CUTOFF_MS = 48 * 60 * 60 * 1000;
+const CUTOFF_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 export async function runReplyJob() {
   const ts = new Date().toISOString();

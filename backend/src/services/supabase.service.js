@@ -217,11 +217,17 @@ export async function getEngagementSettings(userId) {
       .eq('user_id', userId)
       .maybeSingle();
     if (error || !data) return null;
+
+    // Apply defaults for interval columns if not set by user
     return {
       ...data,
       auto_liking: data.auto_liking !== false,
       auto_commenting: data.auto_commenting !== false,
       auto_replying: data.auto_replying !== false,
+      engagement_interval_minutes: data.engagement_interval_minutes ?? 30,
+      reply_interval_minutes: data.reply_interval_minutes ?? 30,
+      reply_to_reply_interval_minutes: data.reply_to_reply_interval_minutes ?? 60,
+      max_engagements_per_day: data.max_engagements_per_day ?? 50,
     };
   } catch (e) {
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getEngagementSettings', userId, error: e.message }));

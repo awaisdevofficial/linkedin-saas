@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, MessageSquare, Reply, Zap } from 'lucide-react';
+import { Save, MessageSquare, Reply, Zap, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -40,6 +40,12 @@ const AutomationSettings = () => {
     custom_reply_prompt?: string;
     enable_post_comment?: boolean;
     freepik_api_key?: string;
+    generation_mode?: string;
+    custom_generation_prompt?: string;
+    image_caption_mode?: string;
+    custom_image_caption?: string;
+    video_caption_mode?: string;
+    custom_video_caption?: string;
   } | null>(null);
   const [engageSettings, setEngageSettings] = useState<Record<string, unknown>>({});
   const [activeTab, setActiveTab] = useState('post');
@@ -124,7 +130,17 @@ const AutomationSettings = () => {
     try {
       if (contentSettings) {
         await supabase.from('user_content_settings').upsert(
-          { user_id: user.id, ...contentSettings, updated_at: new Date().toISOString() },
+          {
+            user_id: user.id,
+            ...contentSettings,
+            generation_mode: contentSettings.generation_mode || 'auto',
+            custom_generation_prompt: contentSettings.custom_generation_prompt || null,
+            image_caption_mode: contentSettings.image_caption_mode || 'content',
+            custom_image_caption: contentSettings.custom_image_caption || null,
+            video_caption_mode: contentSettings.video_caption_mode || 'content',
+            custom_video_caption: contentSettings.custom_video_caption || null,
+            updated_at: new Date().toISOString(),
+          },
           { onConflict: 'user_id' }
         );
       }
@@ -194,6 +210,81 @@ const AutomationSettings = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-0">
+              {/* Generation Mode */}
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#2D5AF6] to-[#7B3FE4] flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[#0f172a]">Content Generation Mode</p>
+                    <p className="text-xs text-[#64748b] mt-0.5">
+                      Let PostPilot pick topics automatically, or write your own instructions
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mode selector */}
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'auto', label: 'Auto by PostPilot', desc: 'Uses your niche + RSS feeds' },
+                    { value: 'custom', label: 'Custom Instructions', desc: 'You define what to write about' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        setContentSettings((s) => ({ ...s, generation_mode: opt.value }))
+                      }
+                      className={`p-3 rounded-xl border text-left transition-colors ${
+                        (contentSettings?.generation_mode || 'auto') === opt.value
+                          ? 'border-[#2D5AF6] bg-[#eff6ff]'
+                          : 'border-[#e2e8f0] bg-[#f8fafc] hover:bg-white'
+                      }`}
+                    >
+                      <p className={`text-sm font-medium ${
+                        (contentSettings?.generation_mode || 'auto') === opt.value
+                          ? 'text-[#2D5AF6]'
+                          : 'text-[#334155]'
+                      }`}>
+                        {opt.label}
+                      </p>
+                      <p className="text-xs text-[#64748b] mt-0.5">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom instruction textarea — only shown when mode = custom */}
+                {(contentSettings?.generation_mode || 'auto') === 'custom' && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-[#334155]">
+                      Your content instructions
+                    </Label>
+                    <Textarea
+                      value={contentSettings?.custom_generation_prompt || ''}
+                      onChange={(e) =>
+                        setContentSettings((s) => ({
+                          ...s,
+                          custom_generation_prompt: e.target.value,
+                        }))
+                      }
+                      rows={4}
+                      placeholder={`Example: Write a motivational post about AI tools for marketers. Use a storytelling format. Start with a surprising statistic. Keep it under 200 words.`}
+                      className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] resize-none text-sm"
+                    />
+                    <p className="text-xs text-[#64748b]">
+                      Be specific — mention topic, style, length, audience, or any format you want
+                    </p>
+                    {!(contentSettings?.custom_generation_prompt?.trim()) && (
+                      <p className="text-xs text-amber-600">
+                        ⚠ No instructions set — generation will be skipped in custom mode
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <Separator className="bg-[#e2e8f0]" />
               <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
                 <Label className="text-sm font-medium text-[#334155] cursor-pointer">Auto post generation</Label>
                 <Switch checked={!generationPaused} onCheckedChange={(checked) => handlePauseGeneration(!checked)} disabled={!!saving} />
@@ -228,6 +319,135 @@ const AutomationSettings = () => {
               <div className="rounded-xl bg-[#eff6ff] border border-[#bfdbfe] p-3 text-sm text-[#1e40af]">
                 When a post has a generated video, the video will be posted to LinkedIn when you publish (manually or via schedule).
               </div>
+              <Separator className="bg-[#e2e8f0]" />
+              <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
+                <Label className="text-sm font-medium text-[#334155] cursor-pointer">Auto-generate image for new posts</Label>
+                <Switch
+                  checked={engageSettings?.auto_generate_image === true}
+                  onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_generate_image: checked }))}
+                  disabled={!!saving}
+                />
+              </div>
+              {/* Image caption mode — only shown when auto_generate_image is enabled */}
+              {engageSettings?.auto_generate_image === true && (
+                <div className="space-y-3 pl-4 border-l-2 border-[#2D5AF6]/20">
+                  <Label className="text-sm font-medium text-[#334155]">
+                    Image prompt source
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: 'content', label: 'From post content', desc: 'Auto-built from hook & body' },
+                      { value: 'custom', label: 'Custom caption', desc: 'You write the image prompt' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setContentSettings((s) => ({ ...s, image_caption_mode: opt.value }))
+                        }
+                        className={`p-3 rounded-xl border text-left transition-colors ${
+                          (contentSettings?.image_caption_mode || 'content') === opt.value
+                            ? 'border-[#2D5AF6] bg-[#eff6ff]'
+                            : 'border-[#e2e8f0] bg-[#f8fafc] hover:bg-white'
+                        }`}
+                      >
+                        <p className={`text-xs font-medium ${
+                          (contentSettings?.image_caption_mode || 'content') === opt.value
+                            ? 'text-[#2D5AF6]'
+                            : 'text-[#334155]'
+                        }`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-xs text-[#64748b] mt-0.5">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  {(contentSettings?.image_caption_mode || 'content') === 'custom' && (
+                    <div className="space-y-1">
+                      <Textarea
+                        value={contentSettings?.custom_image_caption || ''}
+                        onChange={(e) =>
+                          setContentSettings((s) => ({
+                            ...s,
+                            custom_image_caption: e.target.value,
+                          }))
+                        }
+                        rows={2}
+                        placeholder="e.g. A futuristic office with glowing screens and AI robots"
+                        className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] resize-none text-sm"
+                      />
+                      <p className="text-xs text-[#64748b]">
+                        This exact text will be sent to Freepik as the image prompt
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
+                <Label className="text-sm font-medium text-[#334155] cursor-pointer">Auto-generate video for new posts</Label>
+                <Switch
+                  checked={engageSettings?.auto_generate_video === true}
+                  onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_generate_video: checked }))}
+                  disabled={!!saving}
+                />
+              </div>
+              {/* Video caption mode — only shown when auto_generate_video is enabled */}
+              {engageSettings?.auto_generate_video === true && (
+                <div className="space-y-3 pl-4 border-l-2 border-[#2D5AF6]/20">
+                  <Label className="text-sm font-medium text-[#334155]">
+                    Video prompt source
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: 'content', label: 'From post content', desc: 'Auto-built from hook & body' },
+                      { value: 'custom', label: 'Custom caption', desc: 'You write the video prompt' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setContentSettings((s) => ({ ...s, video_caption_mode: opt.value }))
+                        }
+                        className={`p-3 rounded-xl border text-left transition-colors ${
+                          (contentSettings?.video_caption_mode || 'content') === opt.value
+                            ? 'border-[#2D5AF6] bg-[#eff6ff]'
+                            : 'border-[#e2e8f0] bg-[#f8fafc] hover:bg-white'
+                        }`}
+                      >
+                        <p className={`text-xs font-medium ${
+                          (contentSettings?.video_caption_mode || 'content') === opt.value
+                            ? 'text-[#2D5AF6]'
+                            : 'text-[#334155]'
+                        }`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-xs text-[#64748b] mt-0.5">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  {(contentSettings?.video_caption_mode || 'content') === 'custom' && (
+                    <div className="space-y-1">
+                      <Textarea
+                        value={contentSettings?.custom_video_caption || ''}
+                        onChange={(e) =>
+                          setContentSettings((s) => ({
+                            ...s,
+                            custom_video_caption: e.target.value,
+                          }))
+                        }
+                        rows={2}
+                        placeholder="e.g. A time-lapse of a city transforming with technology"
+                        className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#2D5AF6] resize-none text-sm"
+                      />
+                      <p className="text-xs text-[#64748b]">
+                        This exact text will be sent to Freepik as the video prompt
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               <Separator className="bg-[#e2e8f0]" />
               <div className="space-y-3">
                 <Label className="text-sm font-medium text-[#334155]">Niche</Label>

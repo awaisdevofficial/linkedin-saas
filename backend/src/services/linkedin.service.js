@@ -326,7 +326,7 @@ export async function commentOnPost(credentials, postUrn, commentText) {
 export async function likePost(credentials, activityId) {
   const urn = activityId.startsWith('urn:') ? activityId : `urn:li:activity:${activityId}`;
   try {
-    await axios.post(
+    const res = await axios.post(
       `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(urn)}/likes`,
       { actor: credentials.personUrn },
       {
@@ -337,13 +337,41 @@ export async function likePost(credentials, activityId) {
         },
       }
     );
-    console.log(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'likePost', activityId, status: 'liked' }));
-    return {};
+    // LinkedIn returns the confirmed activity URN in the `object` field
+    const confirmedUrn = res.data?.object || urn;
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'linkedin',
+      action: 'likePost',
+      activityId,
+      confirmedUrn,
+      status: 'liked',
+    }));
+    return { confirmedUrn };
   } catch (e) {
     if (e.response?.status === 409) return { skipped: true };
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'linkedin', action: 'likePost', activityId, error: e.response?.data || e.message }));
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'linkedin',
+      action: 'likePost',
+      activityId,
+      error: e.response?.data || e.message,
+    }));
     return { error: true };
   }
+}
+
+function extractCommenterData(el) {
+  const actor =
+    el.commenter?.['com.linkedin.voyager.feed.MemberActor'] || {};
+  const authorUrn = actor.urn || el.commenterProfileId || '';
+  const authorName = actor.name?.text || '';
+  const authorHeadline = actor.description?.text || '';
+  const authorId = authorUrn.split(':').pop() || '';
+  const authorProfileUrl = authorId
+    ? `https://www.linkedin.com/in/${authorId}`
+    : '';
+  return { authorUrn, authorName, authorHeadline, authorProfileUrl };
 }
 
 export async function getPostComments(credentials, postUrn) {
@@ -391,12 +419,19 @@ export async function getPostComments(credentials, postUrn) {
 
     if (inlineComments.length > 0) {
       return {
-        comments: inlineComments.map((el) => ({
-          commentUrn: el.urn,
-          authorUrn: el.commenter?.['com.linkedin.voyager.feed.MemberActor']?.urn || el.commenterProfileId,
-          text: (el.commentV2?.text || '').trim(),
-          createdAt: el.createdTime,
-        })),
+        comments: inlineComments.map((el) => {
+          const { authorUrn, authorName, authorHeadline, authorProfileUrl } =
+            extractCommenterData(el);
+          return {
+            commentUrn: el.urn,
+            authorUrn,
+            authorName,
+            authorHeadline,
+            authorProfileUrl,
+            text: (el.commentV2?.text || '').trim(),
+            createdAt: el.createdTime,
+          };
+        }),
         activityUrn,
       };
     }
@@ -422,12 +457,19 @@ export async function getPostComments(credentials, postUrn) {
       || commentsRes.data?.comments?.elements
       || [];
     return {
-      comments: elements.map((el) => ({
-        commentUrn: el.urn,
-        authorUrn: el.commenter?.['com.linkedin.voyager.feed.MemberActor']?.urn || el.commenterProfileId,
-        text: (el.commentV2?.text || '').trim(),
-        createdAt: el.createdTime,
-      })),
+      comments: elements.map((el) => {
+        const { authorUrn, authorName, authorHeadline, authorProfileUrl } =
+          extractCommenterData(el);
+        return {
+          commentUrn: el.urn,
+          authorUrn,
+          authorName,
+          authorHeadline,
+          authorProfileUrl,
+          text: (el.commentV2?.text || '').trim(),
+          createdAt: el.createdTime,
+        };
+      }),
       activityUrn,
     };
   } catch (e) {

@@ -138,6 +138,53 @@ export async function generatePost(article, userSettings) {
   }
 }
 
+// Generate post from a user's custom instruction prompt (no article/RSS needed)
+export async function generatePostFromCustomPrompt(customPrompt, settings) {
+  if (!groqClient) return null;
+  const systemPrompt = `You are a professional LinkedIn content creator.
+The user has given you specific instructions for what kind of post to create.
+Follow their instructions exactly.
+${settings?.brand_voice_description ? `Brand voice: ${settings.brand_voice_description}` : ''}
+${settings?.post_tone ? `Tone: ${settings.post_tone}` : ''}
+${settings?.target_audience ? `Target audience: ${settings.target_audience}` : ''}
+
+Return a JSON object with these exact fields:
+{
+  "headline_hook": "attention-grabbing first line",
+  "post_copy": "main post body (no hook, no hashtags)",
+  "hashtags": ["hashtag1", "hashtag2", "hashtag3"],
+  "suggested_comments": ["comment1", "comment2"],
+  "visual_prompt": "short image description for AI generation"
+}
+Return ONLY the JSON. No markdown. No explanation.`;
+
+  const userMessage = `Create a LinkedIn post based on these instructions:\n\n${customPrompt}`;
+
+  try {
+    const response = await groqClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      temperature: 0.8,
+      max_tokens: 1500,
+    });
+
+    const raw = response.choices?.[0]?.message?.content || '';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+  } catch (e) {
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'openai',
+      action: 'generatePostFromCustomPrompt',
+      error: e.message,
+    }));
+    return null;
+  }
+}
+
 export async function generateComment(postDescription, systemPrompt) {
   if (!groqClient) throw new Error('GROQ_API_KEY not set');
   try {

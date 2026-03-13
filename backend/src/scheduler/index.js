@@ -1,6 +1,5 @@
 import cron from 'node-cron';
 import { runGenerateJob } from '../jobs/generate.job.js';
-import { runMediaJob } from '../jobs/media.job.js';
 import { runPublishJob } from '../jobs/publish.job.js';
 import { runEngageJob } from '../jobs/engage.job.js';
 import { runReplyJob } from '../jobs/reply.job.js';
@@ -9,29 +8,17 @@ import { runResetJob } from '../jobs/reset.job.js';
 import { logger } from '../utils/logger.js';
 
 export function startScheduler() {
-  logger.automation('scheduler_registering', { jobs: ['generate', 'media', 'publish', 'engage', 'reply', 'health', 'reset'] });
+  logger.automation('scheduler_registering', { jobs: ['generate', 'publish', 'engage', 'reply', 'health', 'reset'] });
 
-  // Generate: every 12 hours
-  cron.schedule('0 */12 * * *', async () => {
+  // Generate: every hour
+  cron.schedule('0 * * * *', async () => {
     const timestamp = new Date().toISOString();
-    logger.automation('cron_triggered', { job: 'generate', schedule: '0 */12 * * *', timestamp });
+    logger.automation('cron_triggered', { job: 'generate', schedule: '0 * * * *', timestamp });
     try {
       const result = await runGenerateJob();
       logger.automation('cron_completed', { job: 'generate', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'generate', error: e.message, timestamp });
-    }
-  });
-
-  // Media: every 30 minutes
-  cron.schedule('*/30 * * * *', async () => {
-    const timestamp = new Date().toISOString();
-    logger.automation('cron_triggered', { job: 'media', schedule: '*/30 * * * *', timestamp });
-    try {
-      const result = await runMediaJob();
-      logger.automation('cron_completed', { job: 'media', result, timestamp });
-    } catch (e) {
-      logger.automation('cron_failed', { job: 'media', error: e.message, timestamp });
     }
   });
 

@@ -50,12 +50,16 @@ export async function runPublishJob() {
 
         await sleep(120000);
 
+        // After publishing, post suggested comments
         const suggestedComments = post.suggested_comments || [];
         for (let i = 0; i < Math.min(3, suggestedComments.length); i++) {
           try {
+            // commentOnPost handles URN conversion internally (ugcPost → activity)
             await linkedin.commentOnPost(credentials, postUrn, suggestedComments[i]);
             await sleep(60000);
-          } catch (_) {}
+          } catch (e) {
+            logger.automation('publish_job_comment_error', { userId, postId: post.id, error: e.message });
+          }
         }
       } catch (e) {
         logger.automation('publish_job_user_error', { userId, error: e.message });
