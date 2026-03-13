@@ -420,17 +420,46 @@ export async function hasReplied(userId, commentUrn) {
   }
 }
 
+/** Returns true if this user already performed this action on this activity (e.g. like or comment). */
+export async function hasEngaged(userId, activityId, action) {
+  if (!userId || !activityId || !action) return false;
+  try {
+    const supabase = getClient();
+    const { data, error } = await supabase
+      .from('engagement_logs')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('activity_id', String(activityId))
+      .eq('action', action)
+      .limit(1);
+    if (error) return false;
+    return (data?.length ?? 0) > 0;
+  } catch (e) {
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'hasEngaged', userId, activityId, action, error: e.message }));
+    return false;
+  }
+}
+
 export async function getDailyEngagementCount(userId) {
   try {
     const supabase = getClient();
     const now = new Date();
     const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const startIso = start.toISOString();
     const { count, error } = await supabase
       .from('engagement_logs')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .gte('created_at', start.toISOString());
-    if (error) return 0;
+      .gte('executed_at', startIso);
+    if (error) {
+      // Fallback if executed_at missing: use created_at
+      const { count: c2, error: e2 } = await supabase
+        .from('engagement_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', startIso);
+      return e2 ? 0 : (c2 ?? 0);
+    }
     return count ?? 0;
   } catch (e) {
     return 0;

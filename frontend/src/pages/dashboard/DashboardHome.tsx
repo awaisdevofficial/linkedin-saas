@@ -98,7 +98,10 @@ const DashboardHome = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!supabase || !user) return;
+    if (!supabase || !user) {
+      setLoading(false);
+      return;
+    }
     const client = supabase as SupabaseClient;
 
     const refresh = () =>

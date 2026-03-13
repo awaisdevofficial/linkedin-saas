@@ -53,7 +53,10 @@ const AutomationSettings = () => {
   const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase || !user) return;
+    if (!supabase || !user) {
+      setLoading(false);
+      return;
+    }
     const client = supabase;
 
     const fetch = async () => {
@@ -117,11 +120,18 @@ const AutomationSettings = () => {
 
   const handleSaveEngage = async () => {
     if (!supabase || !user) return;
-    const client = supabase;
-    await client.from('engagement_settings').upsert(
-      { user_id: user.id, ...engageSettings },
-      { onConflict: 'user_id' }
-    );
+    setSaving('engage');
+    try {
+      await supabase.from('engagement_settings').upsert(
+        { user_id: user.id, ...engageSettings },
+        { onConflict: 'user_id' }
+      );
+      toast.success('Engagement settings saved');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save engagement settings');
+    } finally {
+      setSaving(null);
+    }
   };
 
   const handleSaveAll = async () => {

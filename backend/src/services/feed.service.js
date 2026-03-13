@@ -54,11 +54,17 @@ export async function fetchLinkedInFeed(liAtCookie, csrfToken) {
           ? `${author.firstName} ${author.lastName || ''}`.trim()
           : author?.name || '';
         const description = `${authorName}: ${commentary}`.trim().slice(0, 500) || `Post by ${authorName || 'someone'}`;
+        const authorHeadline = author?.headline?.text ?? author?.headline ?? null;
+        const authorProfileUrl = author?.publicProfileUrl ?? null;
 
         items.push({
           activity_id: activityId,
           uri: cleanUrn,
-          description: description,
+          description,
+          author_urn: authorUrn || null,
+          author_name: authorName || null,
+          author_headline: authorHeadline,
+          author_profile_url: authorProfileUrl,
         });
       } catch (_) {
         continue;

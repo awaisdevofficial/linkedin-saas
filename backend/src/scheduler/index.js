@@ -7,80 +7,98 @@ import { runHealthJob } from '../jobs/health.job.js';
 import { runResetJob } from '../jobs/reset.job.js';
 import { logger } from '../utils/logger.js';
 
-export function startScheduler() {
-  logger.automation('scheduler_registering', { jobs: ['generate', 'publish', 'engage', 'reply', 'health', 'reset'] });
+const TZ_UTC = { timezone: 'UTC' };
 
-  // Generate: every hour
+/** Run a job with overlap guard: skip if the same job is already running. */
+const running = new Set();
+async function runWithGuard(name, fn) {
+  if (running.has(name)) {
+    logger.automation('cron_skipped_overlap', { job: name });
+    return;
+  }
+  running.add(name);
+  try {
+    return await fn();
+  } finally {
+    running.delete(name);
+  }
+}
+
+export function startScheduler() {
+  const jobList = ['generate', 'publish', 'engage', 'reply', 'health', 'reset'];
+  logger.automation('scheduler_registering', { jobs: jobList, timezone: 'UTC' });
+
+  // Generate: new posts from RSS (auto) or custom prompt; optional auto image/video. Every hour (UTC).
   cron.schedule('0 * * * *', async () => {
     const timestamp = new Date().toISOString();
     logger.automation('cron_triggered', { job: 'generate', schedule: '0 * * * *', timestamp });
     try {
-      const result = await runGenerateJob();
-      logger.automation('cron_completed', { job: 'generate', result, timestamp });
+      const result = await runWithGuard('generate', () => runGenerateJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'generate', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'generate', error: e.message, timestamp });
     }
-  });
+  }, TZ_UTC);
 
-  // Publish: every 5 minutes
+  // Publish: send ready-to-post items to LinkedIn (one per user), then post suggested comments. Every 5 min (UTC).
   cron.schedule('*/5 * * * *', async () => {
     const timestamp = new Date().toISOString();
     logger.automation('cron_triggered', { job: 'publish', schedule: '*/5 * * * *', timestamp });
     try {
-      const result = await runPublishJob();
-      logger.automation('cron_completed', { job: 'publish', result, timestamp });
+      const result = await runWithGuard('publish', () => runPublishJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'publish', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'publish', error: e.message, timestamp });
     }
-  });
+  }, TZ_UTC);
 
-  // Engage: every 2 hours
-  cron.schedule('0 */2 * * *', async () => {
+  // Engage: like/comment on feed items (respects active window + daily cap). Every 30 min (UTC).
+  cron.schedule('*/30 * * * *', async () => {
     const timestamp = new Date().toISOString();
-    logger.automation('cron_triggered', { job: 'engage', schedule: '0 */2 * * *', timestamp });
+    logger.automation('cron_triggered', { job: 'engage', schedule: '*/30 * * * *', timestamp });
     try {
-      const result = await runEngageJob();
-      logger.automation('cron_completed', { job: 'engage', result, timestamp });
+      const result = await runWithGuard('engage', () => runEngageJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'engage', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'engage', error: e.message, timestamp });
     }
-  });
+  }, TZ_UTC);
 
-  // Reply: every 15 minutes
+  // Reply: reply to comments on user's posts (last 7 days, AI-generated replies). Every 15 min (UTC).
   cron.schedule('*/15 * * * *', async () => {
     const timestamp = new Date().toISOString();
     logger.automation('cron_triggered', { job: 'reply', schedule: '*/15 * * * *', timestamp });
     try {
-      const result = await runReplyJob();
-      logger.automation('cron_completed', { job: 'reply', result, timestamp });
+      const result = await runWithGuard('reply', () => runReplyJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'reply', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'reply', error: e.message, timestamp });
     }
-  });
+  }, TZ_UTC);
 
-  // Health: daily at 8am
+  // Health: run health check (LinkedIn tokens, etc.) and store result. Daily at 08:00 UTC.
   cron.schedule('0 8 * * *', async () => {
     const timestamp = new Date().toISOString();
     logger.automation('cron_triggered', { job: 'health', schedule: '0 8 * * *', timestamp });
     try {
-      const result = await runHealthJob();
-      logger.automation('cron_completed', { job: 'health', result, timestamp });
+      const result = await runWithGuard('health', () => runHealthJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'health', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'health', error: e.message, timestamp });
     }
-  });
+  }, TZ_UTC);
 
-  // Reset: weekly Sunday midnight
+  // Reset: weekly maintenance (extend in reset.job.js as needed). Sunday 00:00 UTC.
   cron.schedule('0 0 * * 0', async () => {
     const timestamp = new Date().toISOString();
     logger.automation('cron_triggered', { job: 'reset', schedule: '0 0 * * 0', timestamp });
     try {
-      const result = await runResetJob();
-      logger.automation('cron_completed', { job: 'reset', result, timestamp });
+      const result = await runWithGuard('reset', () => runResetJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'reset', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'reset', error: e.message, timestamp });
     }
-  });
+  }, TZ_UTC);
 
-  logger.automation('scheduler_registered', { message: 'All cron jobs active' });
+  logger.automation('scheduler_registered', { message: 'All cron jobs active', timezone: 'UTC' });
 }

@@ -77,7 +77,10 @@ const CommentsActivity = () => {
   const [profile, setProfile] = useState<{ avatar_url?: string } | null>(null);
 
   useEffect(() => {
-    if (!supabase || !user) return;
+    if (!supabase || !user) {
+      setLoading(false);
+      return;
+    }
     const client = supabase;
     const userId = user.id;
 

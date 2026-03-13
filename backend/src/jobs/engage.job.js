@@ -5,6 +5,10 @@ import * as linkedin from '../services/linkedin.service.js';
 import * as feed from '../services/feed.service.js';
 import { logger } from '../utils/logger.js';
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Delay between like and comment on the same post (no time gap; comment right after like). */
+const DELAY_LIKE_TO_COMMENT_MS = 5000;
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -68,6 +72,8 @@ export async function runEngageJob() {
           const currentCount = await supabase.getDailyEngagementCount(userId);
           if (currentCount >= (settings.max_engagements_per_day || 50)) break;
 
+          let justLikedThisPost = false;
+
           try {
             if (settings.auto_liking) {
               const alreadyLiked = await supabase.hasEngaged(userId, item.activity_id, 'like');
@@ -90,6 +96,7 @@ export async function runEngageJob() {
                     status: 'completed',
                   });
                   engaged++;
+                  justLikedThisPost = true;
                   logger.automation('engage_job_liked', { userId, activityId: item.activity_id });
                 } else if (likeResult?.skipped) {
                   await supabase.logEngagement(userId, {
@@ -105,6 +112,11 @@ export async function runEngageJob() {
                   });
                 }
               }
+            }
+
+            // Comment on the same post 5 sec after like so both happen on one post with no visible time gap
+            if (justLikedThisPost && settings.auto_commenting) {
+              await sleep(DELAY_LIKE_TO_COMMENT_MS);
             }
 
             if (settings.auto_commenting) {

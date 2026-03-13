@@ -92,7 +92,10 @@ const PostsActivity = () => {
   });
 
   useEffect(() => {
-    if (!supabase || !user) return;
+    if (!supabase || !user) {
+      setLoading(false);
+      return;
+    }
     const client = supabase;
 
     const fetchPosts = async () => {
@@ -247,6 +250,36 @@ const PostsActivity = () => {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Video generation failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRegeneratePost = async (postId: string) => {
+    if (!accessToken) return;
+    setActionLoading(postId);
+    try {
+      const res = await apiCalls.regeneratePost(accessToken, postId);
+      if (res.hook !== undefined || res.content !== undefined || res.hashtags !== undefined) {
+        const updated = {
+          hook: res.hook ?? viewPost?.hook ?? '',
+          content: res.content ?? viewPost?.content ?? '',
+          hashtags: res.hashtags ?? viewPost?.hashtags ?? [],
+          status: 'pending' as const,
+          media_url: null,
+          video_url: null,
+        };
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? { ...p, ...updated } : p))
+        );
+        if (viewPost?.id === postId) setViewPost((prev) => (prev ? { ...prev, ...updated } : null));
+        if (selectedPost?.id === postId) setSelectedPost((prev) => (prev ? { ...prev, hook: updated.hook, content: updated.content, hashtags: updated.hashtags } : null));
+        toast.success('Post content regenerated');
+      } else {
+        toast.success('Regeneration started');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Regenerate post failed');
     } finally {
       setActionLoading(null);
     }
@@ -604,6 +637,15 @@ const PostsActivity = () => {
                       <Edit className="w-4 h-4 mr-2" />
                       Edit
                     </DropdownMenuItem>
+                    {!post.posted && (
+                      <DropdownMenuItem
+                        onClick={() => handleRegeneratePost(post.id)}
+                        disabled={!!actionLoading}
+                      >
+                        <Repeat2 className="w-4 h-4 mr-2" />
+                        Regenerate post
+                      </DropdownMenuItem>
+                    )}
                     {!post.posted && (post.status === 'approved' || post.status === 'ready_to_post') && (
                       <DropdownMenuItem onClick={() => openApproveDialog(post, 'later')}>
                         <Clock className="w-4 h-4 mr-2" />
@@ -896,6 +938,20 @@ const PostsActivity = () => {
                   </Button>
                   {!viewPost.posted && (
                     <>
+                      <Button
+                        variant="outline"
+                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+                        onClick={() => handleRegeneratePost(viewPost.id)}
+                        disabled={!!actionLoading}
+                        title="Regenerate hook, content and hashtags from feed"
+                      >
+                        {actionLoading === viewPost.id ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Repeat2 className="w-4 h-4 mr-2" />
+                        )}
+                        Regenerate post
+                      </Button>
                       {!viewPost.media_url ? (
                         <Button
                           variant="outline"
