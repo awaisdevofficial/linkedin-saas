@@ -497,10 +497,12 @@ app.post('/api/generate', async (req, res) => {
     const force = !!req.body?.force;
     const { runGenerateJob } = await import('./src/jobs/generate.job.js');
     logger.api('generate_triggered', { userId, force });
-    runGenerateJob(userId, { force }).catch((err) => logger.api('generate_job_error', { userId, error: err.message }));
-    return res.status(200).json({ success: true, message: 'Generation started' });
+    const result = await runGenerateJob(userId, { force });
+    logger.api('generate_completed', { userId, result });
+    return res.status(200).json({ success: true, message: 'Generation complete', result });
   } catch (e) {
-    return res.status(500).json({ error: 'Server error' });
+    logger.api('generate_job_error', { error: e?.message });
+    return res.status(500).json({ error: e?.message || 'Server error' });
   }
 });
 

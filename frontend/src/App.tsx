@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { ADMIN_KEY_STORAGE } from '@/lib/config';
 import LandingPage from './pages/LandingPage';
@@ -37,8 +38,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="relative min-h-screen">
+      <TooltipProvider delayDuration={400}>
+        <Router>
+          <div className="relative min-h-screen">
           <Routes>
             <Route path="/" element={<LandingPage />} />
 
@@ -99,6 +101,7 @@ function App() {
           <Toaster />
         </div>
       </Router>
+      </TooltipProvider>
     </AuthProvider>
   );
 }

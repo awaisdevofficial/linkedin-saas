@@ -22,6 +22,11 @@ import {
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useAuth } from '@/lib/auth-context';
@@ -311,12 +316,17 @@ const DashboardHome = () => {
             Your posts, schedule, and connection status at a glance.
           </p>
         </div>
-        <Link to="/dashboard/posts/activity">
-          <Button className="bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full">
-            <Plus className="w-4 h-4 mr-2" />
-            New Post
-          </Button>
-        </Link>
+        <UITooltip>
+          <TooltipTrigger asChild>
+            <Link to="/dashboard/posts/activity">
+              <Button className="bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full">
+                <Plus className="w-4 h-4 mr-2" />
+                New Post
+              </Button>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>Create a new LinkedIn post</TooltipContent>
+        </UITooltip>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

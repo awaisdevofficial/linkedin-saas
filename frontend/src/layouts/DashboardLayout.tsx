@@ -22,16 +22,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-  { icon: Calendar, label: 'Posts', href: '/dashboard/posts/activity' },
-  { icon: MessageSquare, label: 'Comments', href: '/dashboard/comments/activity' },
-  { icon: Zap, label: 'Automation', href: '/dashboard/automation' },
-  { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
+  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', tooltip: 'Overview and quick stats' },
+  { icon: Calendar, label: 'Posts', href: '/dashboard/posts/activity', tooltip: 'Manage and schedule posts' },
+  { icon: MessageSquare, label: 'Comments', href: '/dashboard/comments/activity', tooltip: 'View and reply to comments' },
+  { icon: Zap, label: 'Automation', href: '/dashboard/automation', tooltip: 'Engagement and schedule settings' },
+  { icon: Settings, label: 'Settings', href: '/dashboard/settings', tooltip: 'Profile and account settings' },
 ];
 
 const DashboardLayout = () => {
@@ -129,31 +130,40 @@ const DashboardLayout = () => {
             location.pathname === item.href ||
             (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
           return (
-            <Link
-              key={item.label}
-              to={item.href}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                isActive
-                  ? 'bg-[#2D5AF6] text-white'
-                  : 'text-[#6B7098] hover:bg-[#F6F8FC] hover:text-[#10153E]'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </Link>
+            <Tooltip key={item.label}>
+              <TooltipTrigger asChild>
+                <Link
+                  to={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-[#2D5AF6] text-white'
+                      : 'text-[#6B7098] hover:bg-[#F6F8FC] hover:text-[#10153E]'
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>{item.tooltip}</TooltipContent>
+            </Tooltip>
           );
         })}
       </nav>
 
       <div className="px-3 py-4 border-t border-[#6B7098]/10">
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#6B7098] hover:bg-[#F6F8FC] hover:text-[#10153E] transition-all w-full"
-        >
-          <LogOut className="w-5 h-5" />
-          Logout
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#6B7098] hover:bg-[#F6F8FC] hover:text-[#10153E] transition-all w-full"
+            >
+              <LogOut className="w-5 h-5" />
+              Logout
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>Sign out of your account</TooltipContent>
+        </Tooltip>
       </div>
     </>
   );

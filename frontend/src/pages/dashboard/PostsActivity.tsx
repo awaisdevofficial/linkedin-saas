@@ -40,6 +40,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -175,7 +180,7 @@ const PostsActivity = () => {
     setActionLoading('generate');
     try {
       await apiCalls.generate(accessToken);
-      toast.success('Generation started');
+      toast.success('Generation complete');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Generation failed');
     } finally {
@@ -185,7 +190,7 @@ const PostsActivity = () => {
 
   const handlePublishNow = async (postId: string) => {
     if (!accessToken) return;
-    setActionLoading(postId);
+    setActionLoading(`publish:${postId}`);
     try {
       await apiCalls.publishNow(accessToken, postId);
       toast.success('Published');
@@ -198,7 +203,7 @@ const PostsActivity = () => {
 
   const handleRegenerateImage = async (postId: string) => {
     if (!accessToken) return;
-    setActionLoading(postId);
+    setActionLoading(`image:${postId}`);
     try {
       const res = await apiCalls.regenerateImage(accessToken, postId);
       if (res.media_url) {
@@ -221,7 +226,7 @@ const PostsActivity = () => {
 
   const handleGenerateImage = async (postId: string) => {
     if (!accessToken) return;
-    setActionLoading(postId);
+    setActionLoading(`image:${postId}`);
     try {
       const res = await apiCalls.generateImageForPost(accessToken, postId);
       if (res.media_url) {
@@ -238,7 +243,7 @@ const PostsActivity = () => {
 
   const handleGenerateVideo = async (postId: string) => {
     if (!accessToken) return;
-    setActionLoading(postId);
+    setActionLoading(`video:${postId}`);
     try {
       const res = await apiCalls.generateVideoForPost(accessToken, postId);
       if (res.video_url) {
@@ -257,7 +262,7 @@ const PostsActivity = () => {
 
   const handleRegeneratePost = async (postId: string) => {
     if (!accessToken) return;
-    setActionLoading(postId);
+    setActionLoading(`regenerate:${postId}`);
     try {
       const res = await apiCalls.regeneratePost(accessToken, postId);
       if (res.hook !== undefined || res.content !== undefined || res.hashtags !== undefined) {
@@ -314,7 +319,7 @@ const PostsActivity = () => {
 
   const handleApproveAndPublishNow = async () => {
     if (!approvePost || !supabase || !accessToken) return;
-    setActionLoading(approvePost.id);
+    setActionLoading(`publish:${approvePost.id}`);
     try {
       await supabase.from('posts').update({ status: 'approved' }).eq('id', approvePost.id);
       await apiCalls.publishNow(accessToken, approvePost.id);
@@ -335,7 +340,7 @@ const PostsActivity = () => {
       toast.error('Please choose a future date and time');
       return;
     }
-    setActionLoading(approvePost.id);
+    setActionLoading(`schedule:${approvePost.id}`);
     try {
       await supabase
         .from('posts')
@@ -422,26 +427,40 @@ const PostsActivity = () => {
           <p className="text-sm text-[#6B7098]">Manage and schedule your LinkedIn posts</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="rounded-full"
-            onClick={handleGenerate}
-            disabled={!!actionLoading}
-          >
-            {actionLoading === 'generate' ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            Generate
-          </Button>
-          <Button
-            className="bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full"
-            onClick={() => setIsNewPostDialogOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New Post
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                className="rounded-full"
+                onClick={handleGenerate}
+                disabled={!!actionLoading}
+              >
+                {actionLoading === 'generate' ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Generate
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              Run AI post generation from your content settings (keeps loading until complete)
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                className="bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full"
+                onClick={() => setIsNewPostDialogOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Post
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              Create a new LinkedIn post
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -484,9 +503,14 @@ const PostsActivity = () => {
               className="pl-10 h-10 w-64 rounded-full bg-white border-[#6B7098]/20"
             />
           </div>
-          <Button variant="outline" size="icon" className="rounded-full border-[#6B7098]/20">
-            <Filter className="w-4 h-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" className="rounded-full border-[#6B7098]/20">
+                <Filter className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>Filter posts</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -525,146 +549,189 @@ const PostsActivity = () => {
               </div>
 
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-full border-[#6B7098]/30 hover:bg-[#F6F8FC]"
-                  onClick={() => {
-                    setViewPost(post);
-                    setIsViewDialogOpen(true);
-                  }}
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
-                {post.status === 'pending' && (
-                  <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="rounded-full border-green-500 text-green-600 hover:bg-green-50"
-                      onClick={() => openApproveDialog(post)}
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full border-red-500 text-red-600 hover:bg-red-50"
-                      onClick={() => handleStatusChange(post.id, 'rejected')}
-                    >
-                      <XCircle className="w-4 h-4" />
-                    </Button>
-                  </>
-                )}
-                {!post.posted && (post.status === 'approved' || post.status === 'ready_to_post') && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full border-[#2D5AF6] text-[#2D5AF6] hover:bg-[#2D5AF6]/10"
-                      onClick={() => openApproveDialog(post, 'later')}
-                      disabled={!!actionLoading}
-                    >
-                      <Clock className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="rounded-full bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-                      onClick={() => handlePublishNow(post.id)}
-                      disabled={!!actionLoading}
-                    >
-                      {actionLoading === post.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </>
-                )}
-                {!post.media_url && !post.posted && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-full"
-                    onClick={() => handleGenerateImage(post.id)}
-                    disabled={!!actionLoading}
-                  >
-                    {actionLoading === post.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Image className="w-4 h-4" />
-                    )}
-                  </Button>
-                )}
-                {post.media_url && !post.posted && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
-                    onClick={() => handleGenerateVideo(post.id)}
-                    disabled={!!actionLoading}
-                    title="Generate video"
-                  >
-                    {actionLoading === post.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Video className="w-4 h-4" />
-                    )}
-                  </Button>
-                )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
+                      className="rounded-full border-[#6B7098]/30 hover:bg-[#F6F8FC]"
                       onClick={() => {
                         setViewPost(post);
                         setIsViewDialogOpen(true);
                       }}
                     >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setSelectedPost({ ...post });
-                        setIsEditDialogOpen(true);
-                      }}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    {!post.posted && (
-                      <DropdownMenuItem
-                        onClick={() => handleRegeneratePost(post.id)}
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={6}>View post</TooltipContent>
+                </Tooltip>
+                {post.status === 'pending' && (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full border-green-500 text-green-600 hover:bg-green-50"
+                          onClick={() => openApproveDialog(post)}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={6}>Approve post</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full border-red-500 text-red-600 hover:bg-red-50"
+                          onClick={() => handleStatusChange(post.id, 'rejected')}
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={6}>Reject post</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
+                {!post.posted && (post.status === 'approved' || post.status === 'ready_to_post') && (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full border-[#2D5AF6] text-[#2D5AF6] hover:bg-[#2D5AF6]/10"
+                          onClick={() => openApproveDialog(post, 'later')}
+                          disabled={!!actionLoading}
+                        >
+                          <Clock className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={6}>Schedule post</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="rounded-full bg-[#2D5AF6] hover:bg-[#1E4AD6]"
+                          onClick={() => handlePublishNow(post.id)}
+                          disabled={!!actionLoading}
+                        >
+                          {actionLoading === `publish:${post.id}` ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={6}>Publish now</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
+                {!post.media_url && !post.posted && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => handleGenerateImage(post.id)}
                         disabled={!!actionLoading}
                       >
-                        <Repeat2 className="w-4 h-4 mr-2" />
-                        Regenerate post
-                      </DropdownMenuItem>
-                    )}
-                    {!post.posted && (post.status === 'approved' || post.status === 'ready_to_post') && (
-                      <DropdownMenuItem onClick={() => openApproveDialog(post, 'later')}>
-                        <Clock className="w-4 h-4 mr-2" />
-                        Schedule
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => handleDuplicatePost(post)}>
-                      <Copy className="w-4 h-4 mr-2" />
-                      Duplicate
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDeletePost(post.id)}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        {actionLoading === `image:${post.id}` ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Image className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={6}>Generate image for this post</TooltipContent>
+                  </Tooltip>
+                )}
+                {!post.posted && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
+                        onClick={() => post.media_url && handleGenerateVideo(post.id)}
+                        disabled={!!actionLoading || !post.media_url}
+                      >
+                        {actionLoading === `video:${post.id}` ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Video className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={6}>
+                      {post.media_url ? 'Generate video from image' : 'Generate an image first'}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="rounded-full">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setViewPost(post);
+                              setIsViewDialogOpen(true);
+                            }}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedPost({ ...post });
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          {!post.posted && (
+                            <DropdownMenuItem
+                              onClick={() => handleRegeneratePost(post.id)}
+                              disabled={!!actionLoading}
+                            >
+                              <Repeat2 className="w-4 h-4 mr-2" />
+                              Regenerate post
+                            </DropdownMenuItem>
+                          )}
+                          {!post.posted && (post.status === 'approved' || post.status === 'ready_to_post') && (
+                            <DropdownMenuItem onClick={() => openApproveDialog(post, 'later')}>
+                              <Clock className="w-4 h-4 mr-2" />
+                              Schedule
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => handleDuplicatePost(post)}>
+                            <Copy className="w-4 h-4 mr-2" />
+                            Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeletePost(post.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={6}>More options</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -945,7 +1012,7 @@ const PostsActivity = () => {
                         disabled={!!actionLoading}
                         title="Regenerate hook, content and hashtags from feed"
                       >
-                        {actionLoading === viewPost.id ? (
+                        {actionLoading === `regenerate:${viewPost.id}` ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         ) : (
                           <Repeat2 className="w-4 h-4 mr-2" />
@@ -959,7 +1026,7 @@ const PostsActivity = () => {
                           onClick={() => handleGenerateImage(viewPost.id)}
                           disabled={!!actionLoading}
                         >
-                          {actionLoading === viewPost.id ? (
+                          {actionLoading === `image:${viewPost.id}` ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           ) : (
                             <Image className="w-4 h-4 mr-2" />
@@ -973,7 +1040,7 @@ const PostsActivity = () => {
                           onClick={() => handleRegenerateImage(viewPost.id)}
                           disabled={!!actionLoading}
                         >
-                          {actionLoading === viewPost.id ? (
+                          {actionLoading === `image:${viewPost.id}` ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           ) : (
                             <RefreshCw className="w-4 h-4 mr-2" />
@@ -981,21 +1048,20 @@ const PostsActivity = () => {
                           Regenerate picture
                         </Button>
                       )}
-                      {viewPost.media_url && (
-                        <Button
-                          variant="outline"
-                          className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
-                          onClick={() => handleGenerateVideo(viewPost.id)}
-                          disabled={!!actionLoading}
-                        >
-                          {actionLoading === viewPost.id ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <Video className="w-4 h-4 mr-2" />
-                          )}
-                          {viewPost.video_url ? 'Regenerate video' : 'Generate video'}
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        className="rounded-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10 disabled:opacity-60"
+                        onClick={() => viewPost.media_url && handleGenerateVideo(viewPost.id)}
+                        disabled={!!actionLoading || !viewPost.media_url}
+                        title={viewPost.media_url ? (viewPost.video_url ? 'Regenerate video' : 'Generate video') : 'Generate an image first'}
+                      >
+                        {actionLoading === `video:${viewPost.id}` ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Video className="w-4 h-4 mr-2" />
+                        )}
+                        {viewPost.video_url ? 'Regenerate video' : 'Generate video'}
+                      </Button>
                       <Button
                         className="bg-[#0A66C2] hover:bg-[#004182] rounded-full"
                         onClick={() => {
@@ -1139,7 +1205,7 @@ const PostsActivity = () => {
                 onClick={handleApproveAndPublishNow}
                 disabled={!!actionLoading}
               >
-                {actionLoading === approvePost?.id ? (
+                {actionLoading === `publish:${approvePost?.id}` ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <Send className="w-4 h-4 mr-2" />
@@ -1152,7 +1218,7 @@ const PostsActivity = () => {
                 onClick={handleApproveAndSchedule}
                 disabled={!!actionLoading}
               >
-                {actionLoading === approvePost?.id ? (
+                {actionLoading === `schedule:${approvePost?.id}` ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <Clock className="w-4 h-4 mr-2" />
