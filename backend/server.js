@@ -379,8 +379,8 @@ app.post('/auth/login-email', async (req, res) => {
   res.json({ redirectUrl: linkData.properties.action_link });
 });
 
-// GET /auth/has-password — check if user has a password set (for redirecting new LinkedIn users to set-password)
-app.get('/auth/has-password', async (req, res) => {
+// GET /api/auth/has-password — check if user has a password set (for redirecting new LinkedIn users to set-password)
+app.get('/api/auth/has-password', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
   try {
@@ -393,8 +393,8 @@ app.get('/auth/has-password', async (req, res) => {
   }
 });
 
-// POST /auth/set-password — new user (e.g. after LinkedIn signup) sets password for email login
-app.post('/auth/set-password', async (req, res) => {
+// POST /api/auth/set-password — new user (e.g. after LinkedIn signup) sets password for email login
+app.post('/api/auth/set-password', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
   const { password } = req.body || {};
@@ -417,8 +417,8 @@ app.post('/auth/set-password', async (req, res) => {
   }
 });
 
-// POST /auth/change-password — logged-in user changes password (current + new)
-app.post('/auth/change-password', async (req, res) => {
+// POST /api/auth/change-password — logged-in user changes password (current + new)
+app.post('/api/auth/change-password', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
   const { currentPassword, newPassword } = req.body || {};
@@ -445,8 +445,8 @@ app.post('/auth/change-password', async (req, res) => {
   }
 });
 
-// POST /auth/update-password — after forgot-password reset flow; syncs new password to user_passwords
-app.post('/auth/update-password', async (req, res) => {
+// POST /api/auth/update-password — after forgot-password reset flow; syncs new password to user_passwords
+app.post('/api/auth/update-password', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
   const { newPassword } = req.body || {};

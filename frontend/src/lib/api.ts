@@ -89,20 +89,20 @@ export const apiCalls = {
     }),
 
   hasPassword: (token: string) =>
-    api<{ hasPassword: boolean }>('/auth/has-password', { token }),
+    api<{ hasPassword: boolean }>('/api/auth/has-password', { token }),
 
   setPassword: (token: string, password: string) =>
-    api<{ success: boolean }>('/auth/set-password', { token, method: 'POST', body: { password } }),
+    api<{ success: boolean }>('/api/auth/set-password', { token, method: 'POST', body: { password } }),
 
   changePassword: (token: string, currentPassword: string, newPassword: string) =>
-    api<{ success: boolean }>('/auth/change-password', {
+    api<{ success: boolean }>('/api/auth/change-password', {
       token,
       method: 'POST',
       body: { currentPassword, newPassword },
     }),
 
   updatePassword: (token: string, newPassword: string) =>
-    api<{ success: boolean }>('/auth/update-password', { token, method: 'POST', body: { newPassword } }),
+    api<{ success: boolean }>('/api/auth/update-password', { token, method: 'POST', body: { newPassword } }),
 
   adminHealth: (adminKey: string) =>
     api<unknown>('/admin/health', { adminKey }),
