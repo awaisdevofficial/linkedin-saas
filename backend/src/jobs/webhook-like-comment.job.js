@@ -15,12 +15,18 @@ function isInActiveWindow(settings) {
   return timeStr >= start && timeStr <= end;
 }
 
-/** Returns true if this user is due for a webhook send (interval elapsed since webhook_last_sent_at). */
+/**
+ * Returns true if this user is due for a webhook send.
+ * Each user has their own engagement_interval_minutes and webhook_last_sent_at;
+ * we only send when (now - webhook_last_sent_at) >= that user's interval.
+ */
 function isDueForWebhook(user) {
   const lastSent = user.webhook_last_sent_at ? new Date(user.webhook_last_sent_at) : null;
-  const intervalMs = (user.engagement_interval_minutes ?? 30) * 60 * 1000;
+  const intervalMinutes = user.engagement_interval_minutes ?? 30;
+  const intervalMs = intervalMinutes * 60 * 1000;
   if (!lastSent) return true;
-  return Date.now() - lastSent.getTime() >= intervalMs;
+  const elapsed = Date.now() - lastSent.getTime();
+  return elapsed >= intervalMs;
 }
 
 /** Build payload to send to Like&Comment webhook (all data for that user). */
@@ -57,8 +63,18 @@ export async function runWebhookLikeCommentJob() {
 
     for (const user of users) {
       try {
-        if (!isInActiveWindow(user)) continue;
-        if (!isDueForWebhook(user)) continue;
+        if (!isInActiveWindow(user)) {
+          logger.automation('webhook_like_comment_skipped_window', { userId: user.user_id });
+          continue;
+        }
+        if (!isDueForWebhook(user)) {
+          logger.automation('webhook_like_comment_skipped_interval', {
+            userId: user.user_id,
+            intervalMinutes: user.engagement_interval_minutes ?? 30,
+            webhook_last_sent_at: user.webhook_last_sent_at || null,
+          });
+          continue;
+        }
 
         const payload = buildWebhookPayload(user);
         const res = await axios.post(WEBHOOK_URL, payload, {
