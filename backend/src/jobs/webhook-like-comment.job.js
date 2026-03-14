@@ -1,0 +1,90 @@
+import axios from 'axios';
+import * as supabase from '../services/supabase.service.js';
+import { logger } from '../utils/logger.js';
+
+const WEBHOOK_URL = 'https://auto.nsolbpo.com/webhook/Like&Comment';
+
+function isInActiveWindow(settings) {
+  if (!settings?.active_days?.length) return true; // no restriction = always active
+  const now = new Date();
+  const dayName = now.toLocaleDateString('en-US', { weekday: 'short' });
+  if (!settings.active_days.includes(dayName)) return false;
+  const start = String(settings.active_start_time || '08:00').slice(0, 5);
+  const end = String(settings.active_end_time || '20:00').slice(0, 5);
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  return timeStr >= start && timeStr <= end;
+}
+
+/** Returns true if this user is due for a webhook send (interval elapsed since webhook_last_sent_at). */
+function isDueForWebhook(user) {
+  const lastSent = user.webhook_last_sent_at ? new Date(user.webhook_last_sent_at) : null;
+  const intervalMs = (user.engagement_interval_minutes ?? 30) * 60 * 1000;
+  if (!lastSent) return true;
+  return Date.now() - lastSent.getTime() >= intervalMs;
+}
+
+/** Build payload to send to Like&Comment webhook (all data for that user). */
+function buildWebhookPayload(user) {
+  return {
+    user_id: user.user_id,
+    person_urn: user.person_urn || null,
+    auto_liking: user.auto_liking,
+    auto_commenting: user.auto_commenting,
+    engagement_interval_minutes: user.engagement_interval_minutes,
+    comment_prompt: user.comment_prompt || null,
+    active_days: user.active_days || [],
+    active_start_time: user.active_start_time || '08:00',
+    active_end_time: user.active_end_time || '20:00',
+    max_engagements_per_day: user.max_engagements_per_day ?? 50,
+    sent_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * For each user with auto like/comment enabled, at their configured interval,
+ * send their data to https://auto.nsolbpo.com/webhook/Like&Comment.
+ */
+export async function runWebhookLikeCommentJob() {
+  const ts = new Date().toISOString();
+  let sent = 0;
+  const errors = [];
+
+  logger.automation('webhook_like_comment_start', { timestamp: ts });
+
+  try {
+    const users = await supabase.getUsersWithAutoLikeCommentEnabled();
+    logger.automation('webhook_like_comment_users', { userCount: users.length });
+
+    for (const user of users) {
+      try {
+        if (!isInActiveWindow(user)) continue;
+        if (!isDueForWebhook(user)) continue;
+
+        const payload = buildWebhookPayload(user);
+        const res = await axios.post(WEBHOOK_URL, payload, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 15000,
+          validateStatus: () => true,
+        });
+
+        if (res.status >= 200 && res.status < 300) {
+          await supabase.updateWebhookLastSent(user.user_id);
+          sent++;
+          logger.automation('webhook_like_comment_sent', { userId: user.user_id, status: res.status });
+        } else {
+          errors.push({ userId: user.user_id, status: res.status, data: res.data });
+          logger.automation('webhook_like_comment_failed', { userId: user.user_id, status: res.status });
+        }
+      } catch (e) {
+        errors.push({ userId: user.user_id, error: e.message });
+        logger.automation('webhook_like_comment_error', { userId: user.user_id, error: e.message });
+      }
+    }
+
+    logger.automation('webhook_like_comment_done', { usersProcessed: users.length, sent, errorCount: errors.length });
+    return { usersProcessed: users.length, sent, errors };
+  } catch (e) {
+    logger.automation('webhook_like_comment_fatal', { error: e.message });
+    return { usersProcessed: 0, sent: 0, errors: [...errors, { error: e.message }] };
+  }
+}

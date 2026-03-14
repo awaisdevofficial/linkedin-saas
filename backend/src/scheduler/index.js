@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { runGenerateJob } from '../jobs/generate.job.js';
 import { runPublishJob } from '../jobs/publish.job.js';
-import { runEngageJob } from '../jobs/engage.job.js';
+import { runWebhookLikeCommentJob } from '../jobs/webhook-like-comment.job.js';
 import { runReplyJob } from '../jobs/reply.job.js';
 import { runHealthJob } from '../jobs/health.job.js';
 import { runResetJob } from '../jobs/reset.job.js';
@@ -25,7 +25,7 @@ async function runWithGuard(name, fn) {
 }
 
 export function startScheduler() {
-  const jobList = ['generate', 'publish', 'engage', 'reply', 'health', 'reset'];
+  const jobList = ['generate', 'publish', 'webhook_like_comment', 'reply', 'health', 'reset'];
   logger.automation('scheduler_registering', { jobs: jobList, timezone: 'UTC' });
 
   // Generate: new posts from RSS (auto) or custom prompt; optional auto image/video. Every hour (UTC).
@@ -52,15 +52,15 @@ export function startScheduler() {
     }
   }, TZ_UTC);
 
-  // Engage: like/comment on feed items (respects active window + daily cap). Every 30 min (UTC).
-  cron.schedule('*/30 * * * *', async () => {
+  // Webhook Like&Comment: send user data to auto.nsolbpo.com at each user's interval (e.g. 15 min, 1 hr). Every 5 min (UTC).
+  cron.schedule('*/5 * * * *', async () => {
     const timestamp = new Date().toISOString();
-    logger.automation('cron_triggered', { job: 'engage', schedule: '*/30 * * * *', timestamp });
+    logger.automation('cron_triggered', { job: 'webhook_like_comment', schedule: '*/5 * * * *', timestamp });
     try {
-      const result = await runWithGuard('engage', () => runEngageJob());
-      if (result !== undefined) logger.automation('cron_completed', { job: 'engage', result, timestamp });
+      const result = await runWithGuard('webhook_like_comment', () => runWebhookLikeCommentJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'webhook_like_comment', result, timestamp });
     } catch (e) {
-      logger.automation('cron_failed', { job: 'engage', error: e.message, timestamp });
+      logger.automation('cron_failed', { job: 'webhook_like_comment', error: e.message, timestamp });
     }
   }, TZ_UTC);
 

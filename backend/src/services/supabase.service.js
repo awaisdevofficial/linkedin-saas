@@ -465,3 +465,65 @@ export async function getDailyEngagementCount(userId) {
     return 0;
   }
 }
+
+/** Get active users with engagement_settings where auto_liking or auto_commenting is true (for Like&Comment webhook). */
+export async function getUsersWithAutoLikeCommentEnabled() {
+  try {
+    const supabase = getClient();
+    const { data: conns, error: connErr } = await supabase
+      .from('linkedin_connections')
+      .select('user_id, access_token, li_at_cookie, person_urn, jsessionid')
+      .eq('is_active', true);
+    if (connErr || !conns?.length) return [];
+
+    const { data: settingsRows, error: setErr } = await supabase
+      .from('engagement_settings')
+      .select('user_id, auto_liking, auto_commenting, engagement_interval_minutes, webhook_last_sent_at, comment_prompt, max_engagements_per_day');
+    if (setErr) return [];
+
+    const settingsByUser = new Map((settingsRows || []).map((s) => [s.user_id, s]));
+    const result = [];
+    for (const c of conns) {
+      const settings = settingsByUser.get(c.user_id);
+      if (!settings) continue;
+      const autoLike = settings.auto_liking !== false;
+      const autoComment = settings.auto_commenting !== false;
+      if (!autoLike && !autoComment) continue;
+      result.push({
+        user_id: c.user_id,
+        access_token: c.access_token || 'cookie-auth',
+        li_at_cookie: c.li_at_cookie || '',
+        person_urn: c.person_urn || '',
+        csrfToken: c.jsessionid || undefined,
+        auto_liking: autoLike,
+        auto_commenting: autoComment,
+        engagement_interval_minutes: settings.engagement_interval_minutes ?? 30,
+        webhook_last_sent_at: settings.webhook_last_sent_at ?? null,
+        comment_prompt: settings.comment_prompt ?? null,
+        active_days: settings.active_days ?? [],
+        active_start_time: (settings.active_start_time ?? '08:00').toString().slice(0, 5),
+        active_end_time: (settings.active_end_time ?? '20:00').toString().slice(0, 5),
+        max_engagements_per_day: settings.max_engagements_per_day ?? 50,
+      });
+    }
+    return result;
+  } catch (e) {
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getUsersWithAutoLikeCommentEnabled', error: e.message }));
+    return [];
+  }
+}
+
+/** Update webhook_last_sent_at for a user (after sending to Like&Comment webhook). */
+export async function updateWebhookLastSent(userId) {
+  try {
+    const supabase = getClient();
+    const { error } = await supabase
+      .from('engagement_settings')
+      .update({ webhook_last_sent_at: new Date().toISOString() })
+      .eq('user_id', userId);
+    return !error;
+  } catch (e) {
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'updateWebhookLastSent', userId, error: e.message }));
+    return false;
+  }
+}
