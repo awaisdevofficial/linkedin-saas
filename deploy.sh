@@ -1,8 +1,19 @@
 #!/bin/bash
 # Server deploy script - run from project root on the server (e.g. ~/linkedin-saas)
+# Usage: cd /path/to/linkedin-saas && bash deploy.sh
 set -e
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
 echo "==> Pulling latest code..."
 git pull origin master
+
+echo "==> Verifying key changes are present..."
+test -f backend/src/jobs/webhook-like-comment.job.js || { echo "Missing webhook-like-comment.job.js"; exit 1; }
+test ! -f backend/src/jobs/engage.job.js || { echo "Old engage.job.js still present"; exit 1; }
+test -f supabase/engagement_webhook_last_sent.sql || { echo "Missing migration engagement_webhook_last_sent.sql"; exit 1; }
+echo "    OK: webhook job and migration in place, engage job removed"
+
 echo "==> Installing root dependencies..."
 npm install
 echo "==> Installing frontend dependencies..."
@@ -11,9 +22,13 @@ echo "==> Installing backend dependencies..."
 npm install --prefix backend
 echo "==> Building frontend..."
 npm run build:frontend
-# Allow nginx (www-data) to read frontend dist
-chmod o+x ~ ~/linkedin-saas ~/linkedin-saas/frontend ~/linkedin-saas/frontend/dist 2>/dev/null || true
-chmod -R o+r ~/linkedin-saas/frontend/dist 2>/dev/null || true
+
+# Allow nginx (www-data) to read frontend dist (adjust path if not ubuntu)
+DIST_DIR="$ROOT/frontend/dist"
+chmod o+x "$(dirname "$ROOT")" "$ROOT" "$ROOT/frontend" "$DIST_DIR" 2>/dev/null || true
+chmod -R o+r "$DIST_DIR" 2>/dev/null || true
+
 echo "==> Restarting backend and automation (PM2)..."
 pm2 restart all --update-env 2>/dev/null || true
-echo "==> Deploy done."
+
+echo "==> Deploy done. Changes verified and services restarted."
