@@ -38,11 +38,13 @@ const Onboarding = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [showCookieHelp, setShowCookieHelp] = useState(false);
   const [showCookie, setShowCookie] = useState(false);
+  const [showSessionId, setShowSessionId] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     liAtCookie: '',
+    jsessionId: '',
     niche: '',
     audience: '',
     tone: '',
@@ -64,11 +66,14 @@ const Onboarding = () => {
       }
       const userId = user.id;
 
-      if (formData.liAtCookie.trim()) {
+      const liAt = formData.liAtCookie.trim();
+      const jsessionId = formData.jsessionId.trim();
+      if (liAt || jsessionId) {
         const { error: connErr } = await supabase.from('linkedin_connections').upsert(
           {
             user_id: userId,
-            li_at_cookie: formData.liAtCookie.trim(),
+            li_at_cookie: liAt || null,
+            jsessionid: jsessionId || null,
             is_active: true,
             last_connected_at: new Date().toISOString(),
           },
@@ -192,11 +197,11 @@ const Onboarding = () => {
 
                   {showCookieHelp && (
                     <div className="bg-[#F6F8FC] rounded-xl p-4 text-sm text-[#6B7098] space-y-2">
-                      <p className="font-medium text-[#10153E]">To find your li_at cookie:</p>
+                      <p className="font-medium text-[#10153E]">To find your LinkedIn cookies:</p>
                       <ol className="list-decimal list-inside space-y-1">
                         <li>Open linkedin.com in your browser</li>
-                        <li>Press F12 → Application → Cookies</li>
-                        <li>Find &quot;li_at&quot; and copy the value</li>
+                        <li>Press F12 → Application → Cookies → https://www.linkedin.com</li>
+                        <li>Find &quot;li_at&quot; and &quot;JSESSIONID&quot; and copy their values</li>
                       </ol>
                     </div>
                   )}
@@ -218,8 +223,29 @@ const Onboarding = () => {
                       {showCookie ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="jsessionId" className="text-[#10153E]">JSESSIONID (optional)</Label>
+                  <div className="relative">
+                    <Input
+                      id="jsessionId"
+                      type={showSessionId ? 'text' : 'password'}
+                      placeholder="Paste your JSESSIONID here (optional)"
+                      value={formData.jsessionId}
+                      onChange={(e) => setFormData({ ...formData, jsessionId: e.target.value })}
+                      className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#2D5AF6] focus:ring-[#2D5AF6]/20 pr-12 font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSessionId(!showSessionId)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7098] hover:text-[#10153E]"
+                    >
+                      {showSessionId ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
                   <p className="text-xs text-[#6B7098]">
-                    Optional. You can connect via OAuth in Settings instead.
+                    Optional. You can connect via OAuth or add cookies later in Settings.
                   </p>
                 </div>
               </div>
@@ -321,7 +347,7 @@ const Onboarding = () => {
                   <span className="text-[#6B7098]">LinkedIn</span>
                   <span className="flex items-center gap-2 text-[#27C696] font-medium">
                     <Check className="w-4 h-4" />{' '}
-                    {formData.liAtCookie ? 'Cookie saved' : 'Add in Settings'}
+                    {formData.liAtCookie || formData.jsessionId ? 'Cookies saved' : 'Add in Settings'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

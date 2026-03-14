@@ -106,23 +106,27 @@ const Settings = () => {
 
   const handleSaveLinkedIn = async () => {
     if (!supabase || !user) return;
+    const liAt = linkedIn.liAt.trim();
+    const jsessionId = linkedIn.jsessionId.trim();
     setSaving('linkedin');
     try {
-      await supabase!.from('linkedin_connections').upsert(
+      const { error } = await supabase.from('linkedin_connections').upsert(
         {
           user_id: user.id,
-          li_at_cookie: linkedIn.liAt.trim() || null,
-          jsessionid: linkedIn.jsessionId.trim() || null,
+          li_at_cookie: liAt || null,
+          jsessionid: jsessionId || null,
           is_active: true,
           last_connected_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' }
       );
-      setIsLinkedInConnected(!!(linkedIn.liAt.trim() || linkedIn.jsessionId.trim()));
-      toast.success('LinkedIn credentials saved');
+      if (error) throw error;
+      setIsLinkedInConnected(!!(liAt || jsessionId));
+      setLinkedIn({ liAt: liAt || '', jsessionId: jsessionId || '' });
+      toast.success('LinkedIn cookies saved');
       window.dispatchEvent(new Event('linkedin-connection-updated'));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed');
+      toast.error(err instanceof Error ? err.message : 'Failed to save cookies');
     } finally {
       setSaving(null);
     }
