@@ -4,26 +4,38 @@ import { Eye, EyeOff, ArrowLeft, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ADMIN_KEY_STORAGE } from '@/lib/config';
 import { apiCalls } from '@/lib/api';
+import { ADMIN_KEY_STORAGE, ADMIN_EMAIL_STORAGE, ADMIN_ROLE_STORAGE } from '@/lib/config';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
   const [showKey, setShowKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
   const [adminKey, setAdminKey] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const emailTrim = email.trim().toLowerCase();
+    if (!emailTrim || !adminKey) {
+      setError('Email and API key required');
+      return;
+    }
     setIsLoading(true);
     try {
-      await apiCalls.adminHealth(adminKey);
-      sessionStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
-      navigate('/admin');
+      const res = await apiCalls.adminLogin(emailTrim, adminKey);
+      if (res?.success && res?.admin) {
+        localStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
+        localStorage.setItem(ADMIN_EMAIL_STORAGE, res.admin.email);
+        localStorage.setItem(ADMIN_ROLE_STORAGE, res.admin.role || 'viewer');
+        navigate('/admin');
+      } else {
+        setError('Invalid response');
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid admin key');
+      setError(err instanceof Error ? err.message : 'Invalid email or API key');
     } finally {
       setIsLoading(false);
     }
@@ -50,7 +62,7 @@ const AdminLogin = () => {
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-[#10153E] mb-2">Admin Login</h1>
             <p className="text-sm text-[#6B7098]">
-              Enter your admin API key to access the Admin Panel.
+              Enter your admin email and API key to access the Admin Panel.
             </p>
           </div>
 
@@ -60,12 +72,24 @@ const AdminLogin = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="adminKey" className="text-[#10153E]">Admin API Key</Label>
+              <Label htmlFor="email" className="text-[#10153E]">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Admin email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#2D5AF6] focus:ring-[#2D5AF6]/20"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="adminKey" className="text-[#10153E]">API Key</Label>
               <div className="relative">
                 <Input
                   id="adminKey"
                   type={showKey ? 'text' : 'password'}
-                  placeholder="Enter your admin API key"
+                  placeholder="Admin API key"
                   value={adminKey}
                   onChange={(e) => setAdminKey(e.target.value)}
                   className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#2D5AF6] focus:ring-[#2D5AF6]/20 pr-12 font-mono text-sm"
@@ -86,7 +110,7 @@ const AdminLogin = () => {
               className="w-full h-12 bg-[#2D5AF6] hover:bg-[#1E4AD6] text-white rounded-full font-medium"
               disabled={isLoading}
             >
-              {isLoading ? 'Verifying...' : 'Sign in to Admin Panel'}
+              {isLoading ? 'Signing in...' : 'Sign in to Admin Panel'}
             </Button>
           </form>
 

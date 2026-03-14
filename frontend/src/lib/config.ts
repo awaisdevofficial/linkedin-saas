@@ -15,3 +15,16 @@ export const OAUTH_BACKEND_URL =
     ? window.location.origin
     : 'http://localhost:4000');
 export const ADMIN_KEY_STORAGE = 'postpilot_admin_key';
+export const ADMIN_EMAIL_STORAGE = 'postpilot_admin_email';
+export const ADMIN_ROLE_STORAGE = 'postpilot_admin_role';
+export const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'contact.awais.ai@gmail.com';
+export const ADMIN_API_KEY = import.meta.env.VITE_ADMIN_API_KEY || '20072002';
+
+export function getAdminAuth(): { adminKey: string | null; adminEmail: string | null; role: string | null } {
+  if (typeof window === 'undefined') return { adminKey: null, adminEmail: null, role: null };
+  return {
+    adminKey: localStorage.getItem(ADMIN_KEY_STORAGE),
+    adminEmail: localStorage.getItem(ADMIN_EMAIL_STORAGE),
+    role: localStorage.getItem(ADMIN_ROLE_STORAGE),
+  };
+}

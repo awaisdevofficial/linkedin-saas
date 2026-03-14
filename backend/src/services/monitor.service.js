@@ -113,13 +113,24 @@ export async function getUserErrorCount(userId, hoursBack = 24) {
   }
 }
 
-export async function logAdminAction(action, targetUserId, details) {
+/** @param opts - { adminId?, adminEmail?, targetUserId?, targetEmail?, details? } */
+export async function logAdminAction(action, opts = {}) {
   try {
     const supabase = getSupabase();
+    const raw = typeof opts === 'object' && opts !== null ? opts : { targetUserId: opts };
+    const adminId = raw.adminId ?? null;
+    const adminEmail = raw.adminEmail ?? null;
+    const targetUserId = raw.targetUserId ?? raw.target_user_id ?? null;
+    const targetEmail = raw.targetEmail ?? raw.target_email ?? null;
+    const details = raw.details ?? null;
     await supabase.from('admin_logs').insert({
       action,
-      target_user_id: targetUserId || null,
-      details: details || null,
+      admin_id: adminId,
+      performed_by: adminEmail || 'admin',
+      admin_email: adminEmail,
+      target_user_id: targetUserId,
+      target_email: targetEmail,
+      details,
       created_at: new Date().toISOString(),
     });
   } catch (e) {

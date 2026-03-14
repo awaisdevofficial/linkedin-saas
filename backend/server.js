@@ -279,9 +279,17 @@ app.get('/auth/linkedin/callback', async (req, res) => {
         full_name: fullName,
         email: userEmail,
         avatar_url: avatarUrl,
+        status: 'pending',
+        created_at: new Date().toISOString(),
       }).then((r) => {
         if (r.error && r.error.code !== '23505') logger.auth('profile_insert_error', { error: r.error?.message });
       });
+      try {
+        const { sendNewSignupNotificationAdmin } = await import('./src/services/email.service.js');
+        await sendNewSignupNotificationAdmin(userEmail, fullName, new Date().toISOString());
+      } catch (e) {
+        logger.auth('admin_signup_notification_error', { error: e?.message });
+      }
     }
 
     // Store LinkedIn connection (tokens); preserve existing li_at_cookie and jsessionid if user saved them in Settings
@@ -477,6 +485,101 @@ app.get('/health', (req, res) => {
     linkedin: !!LINKEDIN_CLIENT_ID,
     supabase: !!supabaseAdmin,
   });
+});
+
+// ——— API access guard: after JWT verify, check profiles.status (pending/banned/expired → 403)
+async function apiAuthGuard(req, res, next) {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) {
+    return next();
+  }
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return next();
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('status, access_expires_at, ban_reason')
+      .eq('id', user.id)
+      .single();
+    const status = profile?.status ?? 'approved';
+    if (status === 'pending') {
+      return res.status(403).json({
+        error: 'PENDING_APPROVAL',
+        message: 'Your account is pending admin approval.',
+      });
+    }
+    if (status === 'banned') {
+      return res.status(403).json({
+        error: 'BANNED',
+        message: 'Your account has been banned.',
+        reason: profile?.ban_reason ?? null,
+      });
+    }
+    if (status === 'expired') {
+      return res.status(403).json({
+        error: 'ACCESS_EXPIRED',
+        message: 'Your access has expired. Please contact admin.',
+      });
+    }
+    if (status === 'approved' && profile?.access_expires_at) {
+      const expiresAt = new Date(profile.access_expires_at).getTime();
+      if (expiresAt < Date.now()) {
+        await supabaseAdmin.from('profiles').update({ status: 'expired' }).eq('id', user.id);
+        return res.status(403).json({
+          error: 'ACCESS_EXPIRED',
+          message: 'Your access has expired. Please contact admin.',
+        });
+      }
+    }
+  } catch (e) {
+    logger.api('api_auth_guard_error', { error: e?.message });
+  }
+  next();
+}
+app.use('/api', apiAuthGuard);
+
+// GET /api/feature-flags — which dashboard pages are enabled and what message to show when disabled
+app.get('/api/feature-flags', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const { data: rows } = await supabaseAdmin.from('feature_flags').select('key, enabled, message_type, custom_message');
+    const flags = {};
+    const messageMap = { coming_soon: 'Coming soon', maintenance: 'In maintenance' };
+    (rows || []).forEach((r) => {
+      const msgType = r.message_type || 'coming_soon';
+      flags[r.key] = {
+        enabled: r.enabled === true,
+        messageType: msgType,
+        message: msgType === 'custom' && r.custom_message ? r.custom_message : (messageMap[msgType] || 'Coming soon'),
+      };
+    });
+    return res.json(flags);
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'Server error' });
+  }
+});
+
+// GET /api/invoices — current user's invoices (visible_to_user = true)
+app.get('/api/invoices', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const { data, error } = await supabaseAdmin
+      .from('invoices')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('visible_to_user', true)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return res.json(data || []);
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'Server error' });
+  }
 });
 
 // POST /api/generate — trigger generate job for the authenticated user (optional: single user)

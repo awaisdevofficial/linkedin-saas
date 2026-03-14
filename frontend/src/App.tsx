@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
-import { ADMIN_KEY_STORAGE } from '@/lib/config';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
@@ -17,8 +16,17 @@ import PostsActivity from './pages/dashboard/PostsActivity';
 import CommentsActivity from './pages/dashboard/CommentsActivity';
 import AutomationSettings from './pages/dashboard/AutomationSettings';
 import Settings from './pages/dashboard/Settings';
+import Invoices from './pages/dashboard/Invoices';
+import PendingPage from './pages/Pending';
+import BannedPage from './pages/Banned';
+import ExpiredPage from './pages/Expired';
 import AdminLogin from './pages/admin/AdminLogin';
-import AdminPanel from './pages/admin/AdminPanel';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminInvoices from './pages/admin/AdminInvoices';
+import AdminLogs from './pages/admin/AdminLogs';
+import AdminFeatureFlags from './pages/admin/AdminFeatureFlags';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -79,20 +87,22 @@ function App() {
               <Route path="posts/activity" element={<PostsActivity />} />
               <Route path="comments/activity" element={<CommentsActivity />} />
               <Route path="automation" element={<AutomationSettings />} />
+              <Route path="invoices" element={<Invoices />} />
               <Route path="settings" element={<Settings />} />
             </Route>
 
+            <Route path="/pending" element={<PendingPage />} />
+            <Route path="/banned" element={<BannedPage />} />
+            <Route path="/expired" element={<ExpiredPage />} />
+
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route
-              path="/admin"
-              element={
-                sessionStorage.getItem(ADMIN_KEY_STORAGE) ? (
-                  <AdminPanel />
-                ) : (
-                  <Navigate to="/admin/login" replace />
-                )
-              }
-            />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="invoices" element={<AdminInvoices />} />
+              <Route path="pages" element={<AdminFeatureFlags />} />
+              <Route path="logs" element={<AdminLogs />} />
+            </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   ChevronDown,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,23 +27,38 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
+import { FeatureFlagsProvider, useFeatureFlags } from '@/lib/feature-flags-context';
+import { FeatureDisabledPage } from '@/components/FeatureDisabledPage';
 
-const navItems = [
+const navItems: { icon: typeof LayoutDashboard; label: string; href: string; tooltip: string; flagKey?: string }[] = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', tooltip: 'Overview and quick stats' },
-  { icon: Calendar, label: 'Posts', href: '/dashboard/posts/activity', tooltip: 'Manage and schedule posts' },
-  { icon: MessageSquare, label: 'Comments', href: '/dashboard/comments/activity', tooltip: 'View and reply to comments' },
-  { icon: Zap, label: 'Automation', href: '/dashboard/automation', tooltip: 'Engagement and schedule settings' },
+  { icon: Calendar, label: 'Posts', href: '/dashboard/posts/activity', tooltip: 'Manage and schedule posts', flagKey: 'posts_activity' },
+  { icon: MessageSquare, label: 'Comments', href: '/dashboard/comments/activity', tooltip: 'View and reply to comments', flagKey: 'comments_activity' },
+  { icon: Zap, label: 'Automation', href: '/dashboard/automation', tooltip: 'Engagement and schedule settings', flagKey: 'automation' },
+  { icon: FileText, label: 'Invoices', href: '/dashboard/invoices', tooltip: 'Your invoices and billing' },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings', tooltip: 'Profile and account settings' },
 ];
 
-const DashboardLayout = () => {
+function pathToFlagKey(pathname: string): string | null {
+  if (pathname === '/dashboard/posts/activity') return 'posts_activity';
+  if (pathname === '/dashboard/comments/activity') return 'comments_activity';
+  if (pathname === '/dashboard/automation') return 'automation';
+  return null;
+}
+
+function DashboardLayoutInner() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { isEnabled, getMessage, isLoading: flagsLoading } = useFeatureFlags();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<'ok' | 'missing' | 'needsCookies' | 'expired'>('missing');
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null);
+
+  const flagKey = pathToFlagKey(location.pathname);
+  const pageDisabled = flagKey != null && !flagsLoading && !isEnabled(flagKey);
+  const disabledMessage = flagKey ? getMessage(flagKey) : '';
 
   useEffect(() => {
     if (!supabase || !user) return;
@@ -129,6 +145,8 @@ const DashboardLayout = () => {
           const isActive =
             location.pathname === item.href ||
             (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
+          const disabled = item.flagKey != null && !flagsLoading && !isEnabled(item.flagKey);
+          const tooltipText = disabled && item.flagKey ? getMessage(item.flagKey) : item.tooltip;
           return (
             <Tooltip key={item.label}>
               <TooltipTrigger asChild>
@@ -136,6 +154,8 @@ const DashboardLayout = () => {
                   to={item.href}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    disabled ? 'opacity-60 cursor-not-allowed' : ''
+                  } ${
                     isActive
                       ? 'bg-[#2D5AF6] text-white'
                       : 'text-[#6B7098] hover:bg-[#F6F8FC] hover:text-[#10153E]'
@@ -145,7 +165,7 @@ const DashboardLayout = () => {
                   {item.label}
                 </Link>
               </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8}>{item.tooltip}</TooltipContent>
+              <TooltipContent side="right" sideOffset={8}>{tooltipText}</TooltipContent>
             </Tooltip>
           );
         })}
@@ -259,10 +279,23 @@ const DashboardLayout = () => {
         )}
 
         <main className="p-4 sm:p-6">
-          <Outlet />
+          {pageDisabled ? (
+            <FeatureDisabledPage message={disabledMessage} />
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>
+  );
+}
+
+const DashboardLayout = () => {
+  const { accessToken } = useAuth();
+  return (
+    <FeatureFlagsProvider token={accessToken}>
+      <DashboardLayoutInner />
+    </FeatureFlagsProvider>
   );
 };
 

@@ -6,6 +6,7 @@ import { runScheduleApprovedDailyJob } from '../jobs/schedule-approved-daily.job
 import { runReplyJob } from '../jobs/reply.job.js';
 import { runHealthJob } from '../jobs/health.job.js';
 import { runResetJob } from '../jobs/reset.job.js';
+import { runAccessExpiryJob } from '../jobs/access-expiry.job.js';
 import { logger } from '../utils/logger.js';
 
 const TZ_UTC = { timezone: 'UTC' };
@@ -110,6 +111,18 @@ export function startScheduler() {
       if (result !== undefined) logger.automation('cron_completed', { job: 'reset', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'reset', error: e.message, timestamp });
+    }
+  }, TZ_UTC);
+
+  // Access expiry: set status='expired' for approved users where access_expires_at < NOW(). Every hour (UTC).
+  cron.schedule('0 * * * *', async () => {
+    const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'access_expiry', schedule: '0 * * * *', timestamp });
+    try {
+      const result = await runWithGuard('access_expiry', () => runAccessExpiryJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'access_expiry', result, timestamp });
+    } catch (e) {
+      logger.automation('cron_failed', { job: 'access_expiry', error: e.message, timestamp });
     }
   }, TZ_UTC);
 
