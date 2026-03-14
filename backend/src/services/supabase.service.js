@@ -275,6 +275,50 @@ export async function getReadyToPublishPosts(userId) {
   }
 }
 
+/** Get approved posts (not posted) for daily random scheduling. Excludes posts already scheduled for today. */
+export async function getApprovedPostsForDailySchedule(userId) {
+  try {
+    const supabase = getClient();
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'approved')
+      .eq('posted', false)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) return [];
+    return data || [];
+  } catch (e) {
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getApprovedPostsForDailySchedule', userId, error: e.message }));
+    return [];
+  }
+}
+
+/** Check if user already has a post scheduled for today (ready_to_post, scheduled_at today, not yet posted). */
+export async function hasPostScheduledForToday(userId) {
+  try {
+    const supabase = getClient();
+    const now = new Date();
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    const { data, error } = await supabase
+      .from('posts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'ready_to_post')
+      .eq('posted', false)
+      .gte('scheduled_at', dayStart.toISOString())
+      .lt('scheduled_at', dayEnd.toISOString())
+      .limit(1);
+    if (error) return false;
+    return (data?.length ?? 0) > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function getPostedPosts(userId) {
   try {
     const supabase = getClient();

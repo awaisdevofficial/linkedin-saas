@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { runGenerateJob } from '../jobs/generate.job.js';
 import { runPublishJob } from '../jobs/publish.job.js';
 import { runWebhookLikeCommentJob } from '../jobs/webhook-like-comment.job.js';
+import { runScheduleApprovedDailyJob } from '../jobs/schedule-approved-daily.job.js';
 import { runReplyJob } from '../jobs/reply.job.js';
 import { runHealthJob } from '../jobs/health.job.js';
 import { runResetJob } from '../jobs/reset.job.js';
@@ -25,7 +26,7 @@ async function runWithGuard(name, fn) {
 }
 
 export function startScheduler() {
-  const jobList = ['generate', 'publish', 'webhook_like_comment', 'reply', 'health', 'reset'];
+  const jobList = ['generate', 'publish', 'webhook_like_comment', 'schedule_approved_daily', 'reply', 'health', 'reset'];
   logger.automation('scheduler_registering', { jobs: jobList, timezone: 'UTC' });
 
   // Generate: new posts from RSS (auto) or custom prompt; optional auto image/video. Every hour (UTC).
@@ -61,6 +62,18 @@ export function startScheduler() {
       if (result !== undefined) logger.automation('cron_completed', { job: 'webhook_like_comment', result, timestamp });
     } catch (e) {
       logger.automation('cron_failed', { job: 'webhook_like_comment', error: e.message, timestamp });
+    }
+  }, TZ_UTC);
+
+  // Schedule approved: pick 1 random approved post per user per day, generate image/video if needed, set ready_to_post + scheduled_at. Daily at 06:00 UTC.
+  cron.schedule('0 6 * * *', async () => {
+    const timestamp = new Date().toISOString();
+    logger.automation('cron_triggered', { job: 'schedule_approved_daily', schedule: '0 6 * * *', timestamp });
+    try {
+      const result = await runWithGuard('schedule_approved_daily', () => runScheduleApprovedDailyJob());
+      if (result !== undefined) logger.automation('cron_completed', { job: 'schedule_approved_daily', result, timestamp });
+    } catch (e) {
+      logger.automation('cron_failed', { job: 'schedule_approved_daily', error: e.message, timestamp });
     }
   }, TZ_UTC);
 
