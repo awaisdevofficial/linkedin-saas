@@ -33,6 +33,16 @@ export async function api<T = unknown>(
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // 401 on admin routes (except login) → clear admin session and redirect to login
+    if (res.status === 401 && path.startsWith('/admin') && !path.includes('/admin/login')) {
+      try {
+        localStorage.removeItem('postpilot_admin_key');
+        localStorage.removeItem('postpilot_admin_email');
+        localStorage.removeItem('postpilot_admin_role');
+      } catch (_) {}
+      window.location.href = '/admin/login';
+      throw new Error('Unauthorized');
+    }
     if (res.status === 403 && typeof data?.error === 'string') {
       if (data.error === 'PENDING_APPROVAL') {
         window.location.href = '/pending';
