@@ -16,11 +16,25 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const { adminKey, adminEmail } = getAdminAuth();
-    if (!adminKey) return;
+    if (!adminKey) {
+      setLoading(false);
+      return;
+    }
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    timeoutId = setTimeout(() => {
+      setLoading(false);
+      setError('Request timed out. Check your connection.');
+    }, 15000);
     apiCalls.adminStats(adminKey, adminEmail ?? undefined)
       .then(setStats)
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load stats'))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (timeoutId != null) clearTimeout(timeoutId);
+        setLoading(false);
+      });
+    return () => {
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
   }, []);
 
   if (loading) {

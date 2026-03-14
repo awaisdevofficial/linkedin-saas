@@ -13,6 +13,7 @@ const nav = [
 ];
 
 export default function AdminLayout() {
+  const [authChecked, setAuthChecked] = useState(false);
   const [adminKey, setAdminKey] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -20,6 +21,7 @@ export default function AdminLayout() {
   useEffect(() => {
     const { adminKey: key } = getAdminAuth();
     setAdminKey(key);
+    setAuthChecked(true);
   }, []);
 
   const handleLogout = () => {
@@ -31,7 +33,7 @@ export default function AdminLayout() {
 
   const role = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_ROLE_STORAGE) : null;
 
-  if (adminKey === null) {
+  if (!authChecked) {
     return (
       <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] animate-pulse" />
