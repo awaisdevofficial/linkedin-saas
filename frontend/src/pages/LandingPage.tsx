@@ -7,7 +7,6 @@ import { SchedulingFeature, AnalyticsFeature, EngagementFeature } from '@/compon
 import FloatingCards from '@/components/landing/FloatingCards';
 import SecurityFeature from '@/components/landing/SecurityFeature';
 import Testimonials from '@/components/landing/Testimonials';
-import Pricing from '@/components/landing/Pricing';
 import FAQ from '@/components/landing/FAQ';
 import FinalCTA from '@/components/landing/FinalCTA';
 import Footer from '@/components/landing/Footer';
@@ -15,10 +14,15 @@ import DashboardPreview from '@/components/landing/DashboardPreview';
 
 gsap.registerPlugin(ScrollTrigger);
 
+const LANDING_MOBILE_BREAKPOINT = 1024;
+
 const LandingPage = () => {
   useEffect(() => {
-    // Global snap configuration for pinned sections
+    const isDesktop = () => window.matchMedia(`(min-width: ${LANDING_MOBILE_BREAKPOINT}px)`).matches;
+
+    // Only enable snap on desktop; on mobile it causes jank and poor UX
     const setupSnap = () => {
+      if (!isDesktop()) return;
       const pinned = ScrollTrigger.getAll()
         .filter(st => st.vars.pin)
         .sort((a, b) => a.start - b.start);
@@ -56,7 +60,6 @@ const LandingPage = () => {
       });
     };
 
-    // Delay to ensure all ScrollTriggers are created
     const timer = setTimeout(setupSnap, 100);
 
     return () => {
@@ -91,7 +94,6 @@ const LandingPage = () => {
       
       {/* Flowing Sections */}
       <Testimonials />
-      <Pricing />
       <FAQ />
       
       {/* Final Pinned CTA */}
