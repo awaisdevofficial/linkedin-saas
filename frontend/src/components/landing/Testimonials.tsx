@@ -99,28 +99,28 @@ const Testimonials = () => {
   return (
     <section
       ref={sectionRef}
-      className="relative w-full bg-[#F6F8FC] py-24 z-50"
+      className="relative w-full bg-[#F6F8FC] py-12 sm:py-16 lg:py-24 z-50 px-4 sm:px-6 lg:px-8"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div ref={headerRef} className="text-center mb-16">
-          <p className="mono text-xs uppercase tracking-[0.12em] text-[#4F6DFF] font-medium mb-4">
+        <div ref={headerRef} className="text-center mb-10 sm:mb-16">
+          <p className="mono text-xs uppercase tracking-[0.12em] text-[#4F6DFF] font-medium mb-3 sm:mb-4">
             Testimonials
           </p>
-          <h2 className="text-[clamp(32px,3.6vw,52px)] font-bold text-[#10153E] max-w-[600px] mx-auto">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-[clamp(32px,3.6vw,52px)] font-bold text-[#10153E] max-w-[600px] mx-auto leading-tight">
             Loved by founders, marketers, and creators.
           </h2>
         </div>
 
         {/* Cards Grid */}
-        <div 
+        <div
           ref={cardsRef}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
         >
           {testimonials.map((testimonial, i) => (
             <div
               key={i}
-              className="testimonial-card bg-white rounded-[22px] p-7 card-shadow hover:shadow-lg transition-shadow"
+              className="testimonial-card bg-white rounded-[18px] sm:rounded-[22px] p-5 sm:p-7 card-shadow hover:shadow-lg transition-shadow touch-manipulation"
             >
               <Quote className="w-8 h-8 text-[#4F6DFF]/20 mb-4" />
               <p className="text-lg text-[#10153E] font-medium mb-6 leading-snug">

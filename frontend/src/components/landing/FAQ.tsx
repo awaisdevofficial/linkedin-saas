@@ -88,32 +88,32 @@ const FAQ = () => {
     <section
       ref={sectionRef}
       id="faq"
-      className="relative w-full bg-[#F6F8FC] py-24 z-50"
+      className="relative w-full bg-[#F6F8FC] py-12 sm:py-16 lg:py-24 z-50 px-4 sm:px-6 lg:px-8"
     >
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div ref={headerRef} className="text-center mb-12">
-          <p className="mono text-xs uppercase tracking-[0.12em] text-[#4F6DFF] font-medium mb-4">
+        <div ref={headerRef} className="text-center mb-8 sm:mb-12">
+          <p className="mono text-xs uppercase tracking-[0.12em] text-[#4F6DFF] font-medium mb-3 sm:mb-4">
             FAQ
           </p>
-          <h2 className="text-[clamp(32px,3.6vw,52px)] font-bold text-[#10153E]">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-[clamp(32px,3.6vw,52px)] font-bold text-[#10153E] leading-tight">
             Questions? Answers.
           </h2>
         </div>
 
-        {/* Accordion */}
+        {/* Accordion - touch-friendly triggers */}
         <div ref={accordionRef}>
-          <Accordion type="single" collapsible className="space-y-4">
+          <Accordion type="single" collapsible className="space-y-3 sm:space-y-4">
             {faqs.map((faq, i) => (
-              <AccordionItem 
-                key={i} 
+              <AccordionItem
+                key={i}
                 value={`item-${i}`}
-                className="faq-item bg-white rounded-[18px] px-6 border border-[#6B7098]/18 card-shadow-sm overflow-hidden"
+                className="faq-item bg-white rounded-[16px] sm:rounded-[18px] px-4 sm:px-6 border border-[#6B7098]/18 card-shadow-sm overflow-hidden"
               >
-                <AccordionTrigger className="text-left text-[#10153E] font-semibold hover:no-underline py-5">
+                <AccordionTrigger className="text-left text-[#10153E] font-semibold hover:no-underline py-4 sm:py-5 min-h-[56px] flex items-center touch-manipulation text-sm sm:text-base">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-[#6B7098] pb-5 leading-relaxed">
+                <AccordionContent className="text-[#6B7098] pb-5 leading-relaxed text-sm sm:text-base">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>

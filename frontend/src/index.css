@@ -52,17 +52,19 @@
     padding-left: env(safe-area-inset-left, 0);
     padding-right: env(safe-area-inset-right, 0);
   }
-  /* Touch-friendly: ensure buttons and nav links have comfortable tap targets */
+  /* Touch-friendly: ensure primary CTAs have comfortable tap targets */
   @media (pointer: coarse) {
-    nav button,
-    nav a[href],
     .cta-buttons a,
     .cta-buttons button {
-      min-height: 44px;
+      min-height: 48px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
     }
+  }
+
+  .touch-manipulation {
+    touch-action: manipulation;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Manrope', sans-serif;

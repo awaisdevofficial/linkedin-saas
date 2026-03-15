@@ -67,11 +67,11 @@ const Footer = () => {
   return (
     <footer
       ref={footerRef}
-      className="relative w-full bg-white py-16 z-[70]"
+      className="relative w-full bg-white py-12 sm:py-16 z-[70]"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-10 sm:mb-12">
           {/* Logo Column */}
           <div className="footer-column col-span-2 md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
@@ -87,13 +87,13 @@ const Footer = () => {
 
           {/* Product */}
           <div className="footer-column">
-            <h4 className="font-semibold text-[#10153E] mb-4">{footerLinks.product.title}</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold text-[#10153E] mb-3 sm:mb-4 text-sm sm:text-base">{footerLinks.product.title}</h4>
+            <ul className="space-y-1.5 sm:space-y-2">
               {footerLinks.product.links.map((link, i) => (
                 <li key={i}>
-                  <a 
+                  <a
                     href={link.href}
-                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors"
+                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 block min-h-[44px] flex items-center touch-manipulation"
                   >
                     {link.label}
                   </a>
@@ -104,13 +104,13 @@ const Footer = () => {
 
           {/* Company */}
           <div className="footer-column">
-            <h4 className="font-semibold text-[#10153E] mb-4">{footerLinks.company.title}</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold text-[#10153E] mb-3 sm:mb-4 text-sm sm:text-base">{footerLinks.company.title}</h4>
+            <ul className="space-y-1.5 sm:space-y-2">
               {footerLinks.company.links.map((link, i) => (
                 <li key={i}>
-                  <a 
+                  <a
                     href={link.href}
-                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors"
+                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 block min-h-[44px] flex items-center touch-manipulation"
                   >
                     {link.label}
                   </a>
@@ -121,15 +121,15 @@ const Footer = () => {
 
           {/* Connect */}
           <div className="footer-column">
-            <h4 className="font-semibold text-[#10153E] mb-4">{footerLinks.connect.title}</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold text-[#10153E] mb-3 sm:mb-4 text-sm sm:text-base">{footerLinks.connect.title}</h4>
+            <ul className="space-y-1.5 sm:space-y-2">
               {footerLinks.connect.links.map((link, i) => (
                 <li key={i}>
-                  <a 
+                  <a
                     href={link.href}
-                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors inline-flex items-center gap-2"
+                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors inline-flex items-center gap-2 py-2 min-h-[44px] items-center touch-manipulation"
                   >
-                    {link.icon && <link.icon className="w-4 h-4" />}
+                    {link.icon && <link.icon className="w-4 h-4 shrink-0" />}
                     {link.label}
                   </a>
                 </li>
@@ -139,18 +139,18 @@ const Footer = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-[#6B7098]/15 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-[#6B7098]">
+        <div className="pt-6 sm:pt-8 border-t border-[#6B7098]/15 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-[#6B7098] text-center sm:text-left">
             © {new Date().getFullYear()} PostPilot. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors">
+          <div className="flex items-center gap-4 sm:gap-6 flex-wrap justify-center sm:justify-end">
+            <a href="#" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 px-1 min-h-[44px] flex items-center touch-manipulation">
               Privacy
             </a>
-            <a href="#" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors">
+            <a href="#" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 px-1 min-h-[44px] flex items-center touch-manipulation">
               Terms
             </a>
-            <a href="#" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors">
+            <a href="#" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 px-1 min-h-[44px] flex items-center touch-manipulation">
               Cookies
             </a>
           </div>
