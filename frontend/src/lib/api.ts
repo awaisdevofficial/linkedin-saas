@@ -151,6 +151,16 @@ export const apiCalls = {
   getMyInvoices: (token: string) =>
     api<AdminInvoice[]>('/api/invoices', { token }),
 
+  /** Fetches invoice as HTML for view/print. Returns raw HTML string. */
+  getInvoiceHtml: async (token: string, invoiceId: string): Promise<string> => {
+    const res = await fetch(`${API_URL}/api/invoices/${invoiceId}/html`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Invoice not found');
+    return res.text();
+  },
+
   adminLogin: (email: string, apiKey: string) =>
     api<{ success: boolean; admin: { id: number; email: string; role: string } }>('/admin/login', {
       method: 'POST',
@@ -252,6 +262,65 @@ export const apiCalls = {
       adminEmail,
       method: 'POST',
     }),
+
+  /** Fetch invoice email HTML for admin preview (opens in new window). */
+  adminInvoiceEmailPreview: async (
+    adminKey: string,
+    invoiceId: string,
+    adminEmail?: string
+  ): Promise<string> => {
+    const headers: Record<string, string> = { 'X-Admin-Key': adminKey };
+    if (adminEmail) headers['X-Admin-Email'] = adminEmail;
+    const res = await fetch(`${API_URL}/admin/invoices/${invoiceId}/preview`, {
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Preview not found');
+    return res.text();
+  },
+
+  /** Fetch approval email HTML for admin preview. Params: full_name, days, expires_at (optional). */
+  adminApprovalEmailPreview: async (
+    adminKey: string,
+    params: { full_name?: string; days?: number; expires_at?: string },
+    adminEmail?: string
+  ): Promise<string> => {
+    const q = new URLSearchParams();
+    if (params.full_name != null) q.set('full_name', params.full_name);
+    if (params.days != null) q.set('days', String(params.days));
+    if (params.expires_at != null) q.set('expires_at', params.expires_at);
+    const headers: Record<string, string> = { 'X-Admin-Key': adminKey };
+    if (adminEmail) headers['X-Admin-Email'] = adminEmail;
+    const res = await fetch(`${API_URL}/admin/emails/preview/approval?${q.toString()}`, {
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Preview failed');
+    return res.text();
+  },
+
+  /** Preview invoice email HTML before creating (draft: user_id, amount, currency, description, due_date). */
+  adminInvoiceDraftPreview: async (
+    adminKey: string,
+    params: { user_id: string; amount: string | number; currency?: string; description?: string; due_date?: string },
+    adminEmail?: string
+  ): Promise<string> => {
+    const q = new URLSearchParams();
+    q.set('user_id', params.user_id);
+    q.set('amount', String(params.amount ?? 0));
+    if (params.currency) q.set('currency', params.currency);
+    if (params.description != null) q.set('description', params.description);
+    if (params.due_date) q.set('due_date', params.due_date);
+    const headers: Record<string, string> = { 'X-Admin-Key': adminKey };
+    if (adminEmail) headers['X-Admin-Email'] = adminEmail;
+    const res = await fetch(`${API_URL}/admin/emails/preview/invoice?${q.toString()}`, {
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Preview failed');
+    return res.text();
+  },
+
   adminInvoiceVisibility: (adminKey: string, invoiceId: string, visible_to_user: boolean, adminEmail?: string) =>
     api<AdminInvoice>(`/admin/invoices/${invoiceId}/visibility`, {
       adminKey,

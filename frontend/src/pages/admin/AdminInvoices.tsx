@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { apiCalls, type AdminInvoiceRow } from '@/lib/api';
 import { getAdminAuth } from '@/lib/config';
 import { toast } from 'sonner';
-import { FileText, Mail, DollarSign, Calendar } from 'lucide-react';
+import { FileText, Mail, DollarSign, Calendar, Eye } from 'lucide-react';
 
 export default function AdminInvoices() {
   const { adminKey, adminEmail, role } = getAdminAuth();
@@ -14,6 +14,7 @@ export default function AdminInvoices() {
   const [invoices, setInvoices] = useState<AdminInvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   const load = () => {
     if (!adminKey) return;
@@ -67,6 +68,25 @@ export default function AdminInvoices() {
       toast.error(e instanceof Error ? e.message : 'Failed');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const openPreview = async (invoiceId: string) => {
+    if (!adminKey) return;
+    setPreviewId(invoiceId);
+    try {
+      const html = await apiCalls.adminInvoiceEmailPreview(adminKey, invoiceId, adminEmail ?? undefined);
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.write(html);
+        w.document.close();
+      } else {
+        toast.error('Allow popups to view preview');
+      }
+    } catch {
+      toast.error('Could not load preview');
+    } finally {
+      setPreviewId(null);
     }
   };
 
@@ -132,53 +152,66 @@ export default function AdminInvoices() {
                   <Calendar className="w-4 h-4" />
                   Due: {formatDate(inv.due_date)} · Created: {formatDate(inv.created_at)}
                 </div>
-                {canWrite && (
-                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#6B7098]/10">
-                    {inv.status === 'unpaid' && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="rounded-full"
-                          onClick={() => setStatus(inv.id, 'paid')}
-                          disabled={busyId === inv.id}
-                        >
-                          Mark paid
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full"
-                          onClick={() => setStatus(inv.id, 'cancelled')}
-                          disabled={busyId === inv.id}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full"
-                      onClick={() => resend(inv.id)}
-                      disabled={busyId === inv.id}
-                      title="Resend invoice email"
-                    >
-                      <Mail className="w-4 h-4 mr-1" />
-                      Email
-                    </Button>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={inv.visible_to_user !== false}
-                        onCheckedChange={(v) => setVisibility(inv.id, v)}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#6B7098]/10">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={() => openPreview(inv.id)}
+                    disabled={previewId != null}
+                    title="Preview email (HTML)"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    {previewId === inv.id ? 'Opening…' : 'Preview'}
+                  </Button>
+                  {canWrite && (
+                    <>
+                      {inv.status === 'unpaid' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="rounded-full"
+                            onClick={() => setStatus(inv.id, 'paid')}
+                            disabled={busyId === inv.id}
+                          >
+                            Mark paid
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={() => setStatus(inv.id, 'cancelled')}
+                            disabled={busyId === inv.id}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => resend(inv.id)}
                         disabled={busyId === inv.id}
-                      />
-                      <span className="text-xs text-[#6B7098]">
-                        {inv.visible_to_user !== false ? 'On dashboard' : 'Hidden'}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                        title="Resend invoice email"
+                      >
+                        <Mail className="w-4 h-4 mr-1" />
+                        Email
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={inv.visible_to_user !== false}
+                          onCheckedChange={(v) => setVisibility(inv.id, v)}
+                          disabled={busyId === inv.id}
+                        />
+                        <span className="text-xs text-[#6B7098]">
+                          {inv.visible_to_user !== false ? 'On dashboard' : 'Hidden'}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

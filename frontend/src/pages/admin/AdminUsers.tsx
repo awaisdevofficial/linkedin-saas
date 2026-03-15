@@ -72,6 +72,8 @@ export default function AdminUsers() {
   const [revokeConfirm, setRevokeConfirm] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [previewingApproval, setPreviewingApproval] = useState(false);
+  const [previewingInvoiceDraft, setPreviewingInvoiceDraft] = useState(false);
 
   const load = () => {
     if (!key) return;
@@ -114,6 +116,30 @@ export default function AdminUsers() {
       toast.error(e instanceof Error ? e.message : 'Failed');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const previewApprovalEmail = async () => {
+    if (!key || !selected) return;
+    setPreviewingApproval(true);
+    try {
+      const expiresAt = new Date(Date.now() + approveDays * 24 * 60 * 60 * 1000).toISOString();
+      const html = await apiCalls.adminApprovalEmailPreview(
+        key,
+        { full_name: selected.full_name ?? undefined, days: approveDays, expires_at: expiresAt },
+        adminEmail ?? undefined
+      );
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.write(html);
+        w.document.close();
+      } else {
+        toast.error('Allow popups to view preview');
+      }
+    } catch {
+      toast.error('Could not load email preview');
+    } finally {
+      setPreviewingApproval(false);
     }
   };
 
@@ -188,6 +214,36 @@ export default function AdminUsers() {
     setInvoiceDueDate('');
     setInvoiceOpen(true);
   };
+
+  const previewInvoiceDraft = async () => {
+    if (!key || !selected) return;
+    setPreviewingInvoiceDraft(true);
+    try {
+      const html = await apiCalls.adminInvoiceDraftPreview(
+        key,
+        {
+          user_id: selected.id,
+          amount: invoiceAmount || '0',
+          currency: invoiceCurrency,
+          description: invoiceDescription || undefined,
+          due_date: invoiceDueDate || undefined,
+        },
+        adminEmail ?? undefined
+      );
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.write(html);
+        w.document.close();
+      } else {
+        toast.error('Allow popups to view preview');
+      }
+    } catch {
+      toast.error('Could not load preview');
+    } finally {
+      setPreviewingInvoiceDraft(false);
+    }
+  };
+
   const doInvoice = async () => {
     if (!key || !selected) return;
     const amount = parseFloat(invoiceAmount);
@@ -375,8 +431,11 @@ export default function AdminUsers() {
               <Button key={d} variant="outline" size="sm" onClick={() => setApproveDays(d)}>{d}d</Button>
             ))}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
             <Button variant="outline" onClick={() => setApproveOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={previewApprovalEmail} disabled={busy || previewingApproval}>
+              {previewingApproval ? 'Opening…' : 'Preview email'}
+            </Button>
             <Button onClick={doApprove} disabled={busy}>Approve & Notify User</Button>
           </DialogFooter>
         </DialogContent>
@@ -445,16 +504,17 @@ export default function AdminUsers() {
               <Input type="date" value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} />
             </div>
             {selected && (
-              <div className="rounded-lg bg-[#6B7098]/10 p-3 text-sm">
-                <p className="font-medium">Preview</p>
-                <p>To: {selected.email}</p>
-                <p>Amount: {invoiceAmount || '0'} {invoiceCurrency}</p>
-                <p>Due: {invoiceDueDate || '—'}</p>
+              <div className="rounded-lg bg-[#6B7098]/10 p-3 text-sm space-y-1">
+                <p className="font-medium">To: {selected.email}</p>
+                <p>Amount: {invoiceAmount || '0'} {invoiceCurrency} · Due: {invoiceDueDate || '—'}</p>
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
             <Button variant="outline" onClick={() => setInvoiceOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={previewInvoiceDraft} disabled={busy || previewingInvoiceDraft}>
+              {previewingInvoiceDraft ? 'Opening…' : 'Preview email'}
+            </Button>
             <Button onClick={doInvoice} disabled={busy}>Create & Send Invoice</Button>
           </DialogFooter>
         </DialogContent>

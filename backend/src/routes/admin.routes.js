@@ -6,8 +6,22 @@ import {
   sendApprovalEmail,
   sendInvoiceEmail,
   sendNewSignupNotificationAdmin,
+  sendBanEmail,
+  sendAdminNoteEmail,
 } from '../services/email.service.js';
+import {
+  emailLayout,
+  approvalEmailBody,
+  invoiceFullHtml,
+} from '../templates/email-templates.js';
 import { logger } from '../utils/logger.js';
+
+function getDashboardUrl() {
+  return `${(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/dashboard`;
+}
+function getInvoicesUrl() {
+  return `${(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/dashboard/invoices`;
+}
 
 const router = Router();
 
@@ -261,7 +275,12 @@ router.post('/users/:userId/approve', requireRole('super_admin', 'admin'), async
     if (updateErr) throw updateErr;
 
     await adminLog(req, 'user_approved', { targetUserId: userId, targetEmail: profile.email, details: { days, expires_at: expiresAt.toISOString() } });
-    await sendApprovalEmail(profile.email, profile.full_name, days, expiresAt);
+    try {
+      await sendApprovalEmail(profile.email, profile.full_name, days, expiresAt);
+    } catch (emailErr) {
+      logger.api('admin_approve_email_failed', { userId, email: profile.email, error: emailErr.message });
+      // Approval succeeded; email is best-effort (e.g. fix SMTP credentials in .env)
+    }
     return res.json({ success: true, access_expires_at: expiresAt.toISOString() });
   } catch (e) {
     logger.api('admin_approve_error', { userId, error: e.message });
@@ -275,12 +294,20 @@ router.post('/users/:userId/ban', requireRole('super_admin', 'admin'), async (re
   const reason = req.body?.reason ?? '';
   try {
     const supabase = getClient();
+    const { data: profile } = await supabase.from('profiles').select('email, full_name').eq('id', userId).single();
     const { error } = await supabase
       .from('profiles')
       .update({ status: 'banned', ban_reason: reason || null })
       .eq('id', userId);
     if (error) throw error;
     await adminLog(req, 'user_banned', { targetUserId: userId, details: { reason } });
+    if (profile?.email) {
+      try {
+        await sendBanEmail(profile.email, profile.full_name, reason);
+      } catch (emailErr) {
+        logger.api('admin_ban_email_failed', { userId, error: emailErr.message });
+      }
+    }
     return res.json({ success: true });
   } catch (e) {
     return res.status(500).json({ error: e.message });
@@ -349,17 +376,26 @@ router.post('/users/:userId/revoke', requireRole('super_admin', 'admin'), async 
   }
 });
 
-/** POST /admin/users/:userId/notes — body: { notes } */
+/** POST /admin/users/:userId/notes — body: { notes, send_email?: boolean } to email the note to user */
 router.post('/users/:userId/notes', requireRole('super_admin', 'admin'), async (req, res) => {
   const userId = req.params.userId;
   const notes = req.body?.notes ?? '';
+  const sendEmail = req.body?.send_email === true;
   try {
     const supabase = getClient();
+    const { data: profile } = sendEmail ? await supabase.from('profiles').select('email, full_name').eq('id', userId).single() : { data: null };
     const { error } = await supabase
       .from('profiles')
       .update({ notes: notes || null })
       .eq('id', userId);
     if (error) throw error;
+    if (sendEmail && profile?.email) {
+      try {
+        await sendAdminNoteEmail(profile.email, profile.full_name, notes);
+      } catch (emailErr) {
+        logger.api('admin_notes_email_failed', { userId, error: emailErr.message });
+      }
+    }
     return res.json({ success: true });
   } catch (e) {
     return res.status(500).json({ error: e.message });
@@ -433,8 +469,12 @@ router.post('/users/:userId/invoice', requireRole('super_admin', 'admin'), async
     if (insErr) throw insErr;
 
     if (send_email) {
-      await sendInvoiceEmail(profile.email, profile.full_name, invoice);
-      await supabase.from('invoices').update({ email_sent_at: new Date().toISOString() }).eq('id', invoice.id);
+      try {
+        await sendInvoiceEmail(profile.email, profile.full_name, invoice);
+        await supabase.from('invoices').update({ email_sent_at: new Date().toISOString() }).eq('id', invoice.id);
+      } catch (emailErr) {
+        logger.api('admin_invoice_email_failed', { userId, invoiceId: invoice.id, error: emailErr.message });
+      }
     }
     await adminLog(req, 'invoice_created', { targetUserId: userId, targetEmail: profile.email, details: { invoice_id: invoice.id, invoice_number: invoiceNumber } });
     return res.json(invoice);
@@ -518,6 +558,72 @@ router.patch('/invoices/:invoiceId/status', requireRole('super_admin', 'admin'),
   }
 });
 
+/** GET /admin/invoices/:invoiceId/preview — preview invoice email HTML (admin only) */
+router.get('/invoices/:invoiceId/preview', requireRole('super_admin', 'admin', 'viewer'), async (req, res) => {
+  const invoiceId = req.params.invoiceId;
+  try {
+    const supabase = getClient();
+    const { data: invoice, error: invErr } = await supabase
+      .from('invoices')
+      .select('*, profiles(email, full_name)')
+      .eq('id', invoiceId)
+      .single();
+    if (invErr || !invoice) return res.status(404).send('Invoice not found');
+    const profile = invoice.profiles || {};
+    const userName = profile.full_name || profile.email || 'Customer';
+    const dashboardUrl = getInvoicesUrl();
+    const html = invoiceFullHtml(invoice, userName, dashboardUrl);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'Server error' });
+  }
+});
+
+/** GET /admin/emails/preview/approval — preview approval email HTML. Query: full_name, days, expires_at (ISO, optional) */
+router.get('/emails/preview/approval', requireRole('super_admin', 'admin', 'viewer'), (req, res) => {
+  const full_name = req.query.full_name ?? req.query.fullName ?? '';
+  const days = parseInt(req.query.days, 10) || 30;
+  const expires_at = req.query.expires_at ?? req.query.expiresAt;
+  const expiresStr = expires_at
+    ? new Date(expires_at).toLocaleDateString('en-US', { dateStyle: 'long' })
+    : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { dateStyle: 'long' });
+  const dashboardUrl = getDashboardUrl();
+  const body = approvalEmailBody(full_name || 'there', days, expiresStr, dashboardUrl);
+  const html = emailLayout('Account approved', body);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.send(html);
+});
+
+/** GET /admin/emails/preview/invoice — preview invoice email HTML before creating. Query: user_id, amount, currency, description, due_date */
+router.get('/emails/preview/invoice', requireRole('super_admin', 'admin', 'viewer'), async (req, res) => {
+  const userId = req.query.user_id || req.query.userId;
+  if (!userId) return res.status(400).send('user_id required');
+  const amount = parseFloat(req.query.amount) || 0;
+  const currency = req.query.currency || 'USD';
+  const description = req.query.description || '—';
+  const dueDate = req.query.due_date || req.query.dueDate;
+  const dueStr = dueDate ? new Date(dueDate).toLocaleDateString('en-US', { dateStyle: 'medium' }) : '—';
+  try {
+    const supabase = getClient();
+    const { data: profile } = await supabase.from('profiles').select('full_name, email').eq('id', userId).single();
+    const userName = profile?.full_name || profile?.email || 'Customer';
+    const draftInvoice = {
+      invoice_number: 'PREVIEW',
+      amount: Number(amount) || 0,
+      currency,
+      description,
+      due_date: dueDate || null,
+    };
+    const dashboardUrl = getInvoicesUrl();
+    const html = invoiceFullHtml(draftInvoice, userName, dashboardUrl);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'Server error' });
+  }
+});
+
 /** POST /admin/invoices/:invoiceId/resend — send invoice email again */
 router.post('/invoices/:invoiceId/resend', requireRole('super_admin', 'admin'), async (req, res) => {
   const invoiceId = req.params.invoiceId;
@@ -530,8 +636,12 @@ router.post('/invoices/:invoiceId/resend', requireRole('super_admin', 'admin'), 
       .single();
     if (invErr || !invoice) return res.status(404).json({ error: 'Invoice not found' });
     const profile = invoice.profiles || {};
-    await sendInvoiceEmail(profile.email || invoice.user_id, profile.full_name, invoice);
-    await supabase.from('invoices').update({ email_sent_at: new Date().toISOString() }).eq('id', invoiceId);
+    try {
+      await sendInvoiceEmail(profile.email || invoice.user_id, profile.full_name, invoice);
+      await supabase.from('invoices').update({ email_sent_at: new Date().toISOString() }).eq('id', invoiceId);
+    } catch (emailErr) {
+      logger.api('admin_invoice_resend_email_failed', { invoiceId, error: emailErr.message });
+    }
     await adminLog(req, 'invoice_resent', { targetUserId: invoice.user_id, details: { invoice_id: invoiceId } });
     return res.json({ success: true });
   } catch (e) {

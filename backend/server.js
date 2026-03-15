@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 import adminRoutes from './src/routes/admin.routes.js';
 import { logger } from './src/utils/logger.js';
+import { invoiceFullHtml } from './src/templates/email-templates.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -567,6 +568,33 @@ app.get('/api/invoices', async (req, res) => {
       .order('created_at', { ascending: false });
     if (error) throw error;
     return res.json(data || []);
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'Server error' });
+  }
+});
+
+// GET /api/invoices/:id/html — current user's invoice as HTML (view/print)
+app.get('/api/invoices/:id/html', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  const invoiceId = req.params.id;
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const { data: profile } = await supabaseAdmin.from('profiles').select('full_name').eq('id', user.id).single();
+    const userName = profile?.full_name || user.email?.split('@')[0] || 'Customer';
+    const { data: invoice, error } = await supabaseAdmin
+      .from('invoices')
+      .select('*')
+      .eq('id', invoiceId)
+      .eq('user_id', user.id)
+      .eq('visible_to_user', true)
+      .single();
+    if (error || !invoice) return res.status(404).send('Invoice not found');
+    const dashboardUrl = `${FRONTEND_URL}/dashboard/invoices`;
+    const html = invoiceFullHtml(invoice, userName, dashboardUrl);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
   } catch (e) {
     return res.status(500).json({ error: e?.message || 'Server error' });
   }

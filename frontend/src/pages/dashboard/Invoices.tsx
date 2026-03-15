@@ -4,12 +4,34 @@ import { apiCalls } from '@/lib/api';
 import type { AdminInvoice } from '@/lib/api';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, DollarSign, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FileText, DollarSign, Calendar, ExternalLink } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function Invoices() {
   const { accessToken } = useAuth();
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+
+  const openInvoiceHtml = async (invoiceId: string) => {
+    if (!accessToken) return;
+    setPrintingId(invoiceId);
+    try {
+      const html = await apiCalls.getInvoiceHtml(accessToken, invoiceId);
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.write(html);
+        w.document.close();
+      } else {
+        toast.error('Allow popups to view invoice');
+      }
+    } catch {
+      toast.error('Could not load invoice');
+    } finally {
+      setPrintingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!accessToken) return;
@@ -79,6 +101,16 @@ export default function Invoices() {
                   Due: {formatDate(inv.due_date)}
                   {inv.paid_at && ` · Paid: ${formatDate(inv.paid_at)}`}
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 rounded-full"
+                  onClick={() => openInvoiceHtml(inv.id)}
+                  disabled={printingId === inv.id}
+                >
+                  <ExternalLink className="w-4 h-4 mr-1" />
+                  {printingId === inv.id ? 'Opening…' : 'View / Print'}
+                </Button>
               </CardContent>
             </Card>
           ))}
