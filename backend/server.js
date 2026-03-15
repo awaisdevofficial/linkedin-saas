@@ -1,16 +1,6 @@
-import dotenv from 'dotenv';
+import './load-env.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Load .env from backend dir; fallback when PM2 cwd is project root
-const envPath = path.join(__dirname, '.env');
-dotenv.config({ path: envPath });
-if (!process.env.GEMINI_API_KEY?.trim()) {
-  const fallbackEnv = path.join(process.cwd(), 'backend', '.env');
-  if (fallbackEnv !== envPath) dotenv.config({ path: fallbackEnv });
-}
-
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';

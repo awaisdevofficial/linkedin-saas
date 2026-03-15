@@ -23,7 +23,18 @@ else
 fi
 echo ""
 
-echo "========== 4. PM2 restart =========="
+echo "========== 4. Backend .env check =========="
+if [ -f backend/.env ]; then
+  if ! grep -q '^SUPABASE_URL=.\+' backend/.env 2>/dev/null || ! grep -q '^SUPABASE_SERVICE_ROLE_KEY=.\+' backend/.env 2>/dev/null; then
+    echo "  WARN: backend/.env should set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for admin login and DB."
+    echo "  Edit backend/.env on this server, then run: pm2 restart postpilot-backend"
+  fi
+else
+  echo "  WARN: backend/.env not found. Copy backend/.env.example to backend/.env and set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, etc."
+fi
+echo ""
+
+echo "========== 5. PM2 restart =========="
 pm2 restart all 2>/dev/null || true
 pm2 list
 echo ""
