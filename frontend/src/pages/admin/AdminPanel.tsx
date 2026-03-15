@@ -137,36 +137,36 @@ const AdminPanel = () => {
 
   if (loading || !adminKey) {
     return (
-      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center">
+      <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F8FC]">
-      <header className="bg-white border-b border-[#6B7098]/10 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] flex items-center justify-center">
+    <div className="min-h-dvh min-h-screen bg-[#F6F8FC] overflow-x-hidden">
+      <header className="bg-white border-b border-[#6B7098]/10 px-4 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] flex items-center justify-center shrink-0">
               <Shield className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <h1 className="font-semibold text-lg text-[#10153E]">Admin Panel</h1>
-              <p className="text-xs text-[#6B7098]">System overview, health, and errors</p>
+            <div className="min-w-0">
+              <h1 className="font-semibold text-base sm:text-lg text-[#10153E]">Admin Panel</h1>
+              <p className="text-xs text-[#6B7098] truncate">System overview, health, and errors</p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="rounded-full">
+          <Button variant="outline" onClick={handleLogout} className="rounded-full min-h-[44px] touch-manipulation w-full sm:w-auto shrink-0">
             <LogOut className="w-4 h-4 mr-2" />
             Logout
           </Button>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
         <section>
-          <h2 className="text-lg font-semibold text-[#10153E] mb-4">System Overview</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <h2 className="text-base sm:text-lg font-semibold text-[#10153E] mb-3 sm:mb-4">System Overview</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {systemStats.map((stat, i) => (
               <Card key={i} className="card-shadow border-none">
                 <CardContent className="p-4">
@@ -186,21 +186,21 @@ const AdminPanel = () => {
         </section>
 
         <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[#10153E]">System Health</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h2 className="text-base sm:text-lg font-semibold text-[#10153E]">System Health</h2>
             <Button
               variant="outline"
               size="sm"
-              className="rounded-full"
+              className="rounded-full min-h-[44px] touch-manipulation w-full sm:w-auto"
               onClick={runHealthCheck}
               disabled={isRunningHealthCheck}
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isRunningHealthCheck ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 mr-2 shrink-0 ${isRunningHealthCheck ? 'animate-spin' : ''}`} />
               Run Health Check
             </Button>
           </div>
-          <Card className="card-shadow border-none">
-            <CardContent className="p-0">
+          <Card className="card-shadow border-none overflow-hidden">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -251,9 +251,9 @@ const AdminPanel = () => {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-[#10153E] mb-4">Recent Errors</h2>
-          <Card className="card-shadow border-none">
-            <CardContent className="p-0">
+          <h2 className="text-base sm:text-lg font-semibold text-[#10153E] mb-3 sm:mb-4">Recent Errors</h2>
+          <Card className="card-shadow border-none overflow-hidden">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

@@ -94,7 +94,7 @@ const AuthCallback = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+      <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4 overflow-x-hidden">
         <div className="bg-white rounded-[28px] p-8 card-shadow max-w-md text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <a href="/auth/login" className="text-[#2D5AF6] hover:underline">
@@ -107,7 +107,7 @@ const AuthCallback = () => {
 
   const hasHash = typeof window !== 'undefined' && window.location.hash?.includes('access_token=');
   return (
-    <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+    <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4 overflow-x-hidden">
       <div className="text-center">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] flex items-center justify-center mx-auto mb-4 animate-pulse" />
         <p className="text-[#6B7098] mb-4">Signing you in...</p>

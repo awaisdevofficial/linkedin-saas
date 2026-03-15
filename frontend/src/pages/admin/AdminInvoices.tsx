@@ -107,9 +107,9 @@ export default function AdminInvoices() {
   };
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-[#10153E] mb-2">Invoices</h1>
-      <p className="text-[#6B7098] text-sm mb-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl font-bold text-[#10153E] mb-2">Invoices</h1>
+      <p className="text-[#6B7098] text-sm mb-4 sm:mb-6">
         Create, send, and manage invoices. Toggle visibility to show or hide on the user dashboard.
       </p>
 
@@ -156,7 +156,7 @@ export default function AdminInvoices() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="rounded-full"
+                    className="rounded-full min-h-[36px] touch-manipulation"
                     onClick={() => openPreview(inv.id)}
                     disabled={previewId != null}
                     title="Preview email (HTML)"

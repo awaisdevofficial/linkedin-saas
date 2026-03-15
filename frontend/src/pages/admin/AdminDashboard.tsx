@@ -39,7 +39,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-[50vh]">
+      <div className="p-4 sm:p-8 flex items-center justify-center min-h-[50vh]">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] animate-pulse" />
       </div>
     );
@@ -47,7 +47,7 @@ export default function AdminDashboard() {
 
   if (error || !stats) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <p className="text-red-600">{error || 'Failed to load dashboard'}</p>
       </div>
     );
@@ -66,9 +66,9 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-[#10153E] mb-6">Dashboard</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl font-bold text-[#10153E] mb-4 sm:mb-6">Dashboard</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {cards.map(({ label, value, icon: Icon, badge }) => (
           <Card key={label} className="card-shadow border-none">
             <CardContent className="p-4">

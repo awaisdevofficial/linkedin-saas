@@ -189,8 +189,8 @@ function DashboardLayoutInner() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F6F8FC] flex">
-      <aside className="hidden lg:flex w-64 bg-white border-r border-[#6B7098]/10 flex-col fixed h-full">
+    <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex flex-col lg:flex-row">
+      <aside className="hidden lg:flex w-64 bg-white border-r border-[#6B7098]/10 flex-col fixed left-0 top-0 bottom-0 z-30">
         <SidebarContent />
       </aside>
 
@@ -200,8 +200,8 @@ function DashboardLayoutInner() {
         </SheetContent>
       </Sheet>
 
-      <div className="flex-1 lg:ml-64">
-        <header className="bg-white border-b border-[#6B7098]/10 px-4 sm:px-6 py-4">
+      <div className="flex-1 flex flex-col min-h-0 lg:ml-64">
+        <header className="bg-white border-b border-[#6B7098]/10 px-4 sm:px-6 py-4 shrink-0">
           <div className="flex items-center justify-between gap-4">
             <Sheet>
               <SheetTrigger asChild className="lg:hidden">
@@ -258,7 +258,7 @@ function DashboardLayoutInner() {
         </header>
 
         {connectionStatus !== 'ok' && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-3">
+          <div className="bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-3 shrink-0">
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm text-amber-800">
                 {connectionStatus === 'missing' &&
@@ -278,7 +278,7 @@ function DashboardLayoutInner() {
           </div>
         )}
 
-        <main className="p-4 sm:p-6">
+        <main className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
           {pageDisabled ? (
             <FeatureDisabledPage message={disabledMessage} />
           ) : (

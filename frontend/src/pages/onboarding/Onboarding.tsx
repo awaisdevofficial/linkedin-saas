@@ -155,8 +155,8 @@ const Onboarding = () => {
   const progress = (currentStep / 3) * 100;
 
   return (
-    <div className="min-h-screen bg-[#F6F8FC] flex flex-col">
-      <header className="bg-white border-b border-[#6B7098]/10 px-6 py-4">
+    <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex flex-col overflow-x-hidden">
+      <header className="bg-white border-b border-[#6B7098]/10 px-4 sm:px-6 py-4 shrink-0">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -171,7 +171,7 @@ const Onboarding = () => {
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-6">
+      <main className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-xl">
           {currentStep === 1 && (
             <div className="bg-white rounded-[28px] p-8 card-shadow">

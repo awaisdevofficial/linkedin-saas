@@ -320,18 +320,18 @@ export default function AdminUsers() {
     d ? new Date(d).toLocaleDateString(undefined, { dateStyle: 'short' }) : '—';
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-[#10153E] mb-6">Users</h1>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl font-bold text-[#10153E] mb-4 sm:mb-6">Users</h1>
 
-      <div className="flex flex-wrap items-center gap-4 mb-4">
-        <div className="flex rounded-xl border border-[#6B7098]/20 overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 mb-4">
+        <div className="flex rounded-xl border border-[#6B7098]/20 overflow-x-auto overflow-y-hidden">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f}
               type="button"
               onClick={() => setStatusFilter(f)}
-              className={`px-4 py-2 text-sm font-medium capitalize ${
-                statusFilter === f ? 'bg-[#2D5AF6] text-white' : 'bg-white text-[#6B7098] hover:bg-[#6B7098]/5'
+              className={`px-3 sm:px-4 py-2.5 text-sm font-medium capitalize whitespace-nowrap min-h-[44px] touch-manipulation flex-shrink-0 ${
+                statusFilter === f ? 'bg-[#2D5AF6] text-white' : 'bg-white text-[#6B7098] hover:bg-[#6B7098]/5 active:bg-[#6B7098]/10'
               }`}
             >
               {f}
@@ -342,11 +342,12 @@ export default function AdminUsers() {
           placeholder="Search by email or name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs rounded-xl"
+          className="w-full sm:max-w-xs rounded-xl min-h-[44px]"
         />
       </div>
 
       <div className="bg-white rounded-2xl border border-[#6B7098]/10 overflow-hidden">
+        <div className="overflow-x-auto">
         {loading ? (
           <div className="p-12 text-center text-[#6B7098]">Loading...</div>
         ) : (
@@ -372,9 +373,9 @@ export default function AdminUsers() {
                   <TableCell className="text-[#6B7098]">{formatDate(u.created_at)}</TableCell>
                   <TableCell className="text-[#6B7098]">{formatDate(u.access_expires_at)}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex flex-wrap gap-1 justify-end">
+                    <div className="flex flex-wrap gap-1.5 justify-end">
                       {canWrite && u.status === 'pending' && (
-                        <Button size="sm" variant="default" className="rounded-full" onClick={() => openApprove(u)} disabled={busy}>
+                        <Button size="sm" variant="default" className="rounded-full min-h-[36px] touch-manipulation" onClick={() => openApprove(u)} disabled={busy}>
                           Approve
                         </Button>
                       )}
@@ -406,8 +407,9 @@ export default function AdminUsers() {
             </TableBody>
           </Table>
         )}
+        </div>
         {!loading && filtered.length === 0 && (
-          <div className="p-12 text-center text-[#6B7098]">No users match your filters.</div>
+          <div className="p-8 sm:p-12 text-center text-[#6B7098]">No users match your filters.</div>
         )}
       </div>
 

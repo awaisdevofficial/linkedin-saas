@@ -32,7 +32,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center">
+      <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] animate-pulse" />
       </div>
     );
@@ -48,7 +48,7 @@ function App() {
     <AuthProvider>
       <TooltipProvider delayDuration={400}>
         <Router>
-          <div className="relative min-h-screen">
+          <div className="relative min-h-dvh min-h-screen w-full overflow-x-hidden">
           <Routes>
             <Route path="/" element={<LandingPage />} />
 

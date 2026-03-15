@@ -37,21 +37,22 @@ export default function AdminLogs() {
   const formatDate = (d: string) => new Date(d).toLocaleString();
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-[#10153E] mb-6">Admin Logs</h1>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl font-bold text-[#10153E] mb-4 sm:mb-6">Admin Logs</h1>
 
       <div className="mb-4">
         <Input
           placeholder="Filter by action type..."
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
-          className="max-w-xs rounded-xl"
+          className="w-full sm:max-w-xs rounded-xl min-h-[44px]"
         />
       </div>
 
       <div className="bg-white rounded-2xl border border-[#6B7098]/10 overflow-hidden">
+        <div className="overflow-x-auto">
         {loading ? (
-          <div className="p-12 text-center text-[#6B7098]">Loading...</div>
+          <div className="p-8 sm:p-12 text-center text-[#6B7098]">Loading...</div>
         ) : (
           <Table>
             <TableHeader>
@@ -78,8 +79,9 @@ export default function AdminLogs() {
             </TableBody>
           </Table>
         )}
+        </div>
         {!loading && filtered.length === 0 && (
-          <div className="p-12 text-center text-[#6B7098]">No logs yet.</div>
+          <div className="p-8 sm:p-12 text-center text-[#6B7098]">No logs yet.</div>
         )}
       </div>
     </div>

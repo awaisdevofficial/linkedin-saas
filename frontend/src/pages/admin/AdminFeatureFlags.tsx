@@ -100,15 +100,16 @@ export default function AdminFeatureFlags() {
   };
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-[#10153E] mb-2">Pages & Features</h1>
-      <p className="text-[#6B7098] text-sm mb-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl font-bold text-[#10153E] mb-2">Pages & Features</h1>
+      <p className="text-[#6B7098] text-sm mb-4 sm:mb-6">
         Enable or disable dashboard pages for users. When disabled, they will see your chosen message (e.g. Coming soon, In maintenance).
       </p>
 
       <div className="bg-white rounded-2xl border border-[#6B7098]/10 overflow-hidden">
+        <div className="overflow-x-auto">
         {loading ? (
-          <div className="p-12 text-center text-[#6B7098]">Loading...</div>
+          <div className="p-8 sm:p-12 text-center text-[#6B7098]">Loading...</div>
         ) : (
           <Table>
             <TableHeader>
@@ -173,7 +174,7 @@ export default function AdminFeatureFlags() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="rounded-full"
+                          className="rounded-full min-h-[36px] touch-manipulation"
                           onClick={() => save(row)}
                           disabled={saving === row.key}
                         >
@@ -187,8 +188,9 @@ export default function AdminFeatureFlags() {
             </TableBody>
           </Table>
         )}
+        </div>
         {!loading && flags.length === 0 && (
-          <div className="p-12 text-center text-[#6B7098]">No feature flags. Run the feature_flags.sql migration.</div>
+          <div className="p-8 sm:p-12 text-center text-[#6B7098]">No feature flags. Run the feature_flags.sql migration.</div>
         )}
       </div>
     </div>

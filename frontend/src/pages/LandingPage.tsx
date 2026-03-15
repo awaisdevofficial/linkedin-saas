@@ -69,7 +69,7 @@ const LandingPage = () => {
   }, []);
 
   return (
-    <main className="relative">
+    <main className="relative w-full overflow-x-hidden">
       <Navigation />
       
       {/* Pinned Sections with z-index stacking */}

@@ -73,7 +73,7 @@ const SetPassword = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center">
+      <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] animate-pulse" />
       </div>
     );
@@ -82,7 +82,8 @@ const SetPassword = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+    <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex flex-col overflow-x-hidden">
+      <div className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto p-4 py-8">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-[28px] p-8 card-shadow">
           <div className="flex justify-center mb-6">
@@ -169,6 +170,7 @@ const SetPassword = () => {
             </Button>
           </form>
         </div>
+      </div>
       </div>
     </div>
   );

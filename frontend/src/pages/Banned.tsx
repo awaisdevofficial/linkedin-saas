@@ -24,7 +24,7 @@ const BannedPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+    <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4 overflow-x-hidden">
       <div className="w-full max-w-md text-center">
         <h1 className="text-2xl font-bold text-[#10153E] mb-3">Account Suspended</h1>
         {banReason && (

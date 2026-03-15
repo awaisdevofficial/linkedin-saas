@@ -72,7 +72,7 @@ const ResetPassword = () => {
 
   if (hasSession === null) {
     return (
-      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center">
+      <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2D5AF6] to-[#27C696] animate-pulse" />
       </div>
     );
@@ -80,7 +80,7 @@ const ResetPassword = () => {
 
   if (!hasSession) {
     return (
-      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+      <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4 overflow-x-hidden">
         <div className="bg-white rounded-[28px] p-8 card-shadow max-w-md text-center">
           <p className="text-[#6B7098] mb-4">
             Your reset link may have expired. Please request a new one.
@@ -95,7 +95,7 @@ const ResetPassword = () => {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+      <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4 overflow-x-hidden">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-[28px] p-8 card-shadow text-center">
             <div className="flex justify-center mb-6">
@@ -122,7 +122,8 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+    <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex flex-col overflow-x-hidden">
+      <div className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto p-4 py-8">
       <div className="w-full max-w-md">
         <Link
           to="/auth/login"
@@ -208,6 +209,7 @@ const ResetPassword = () => {
             </Button>
           </form>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -38,7 +38,8 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F8FC] flex items-center justify-center p-4">
+    <div className="min-h-dvh min-h-screen bg-[#F6F8FC] flex flex-col overflow-x-hidden">
+      <div className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto p-4 py-8">
       <div className="w-full max-w-md">
         <Link
           to="/auth/login"
@@ -127,6 +128,7 @@ const ForgotPassword = () => {
             </>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
