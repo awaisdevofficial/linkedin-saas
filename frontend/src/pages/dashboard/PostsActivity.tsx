@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Plus,
-  Search,
   Filter,
   MoreHorizontal,
   Edit,
@@ -48,6 +47,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { apiCalls } from '@/lib/api';
@@ -70,10 +70,11 @@ type Post = {
 };
 
 const PostsActivity = () => {
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') ?? '';
   const { user, accessToken } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [isNewPostDialogOpen, setIsNewPostDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
@@ -582,16 +583,9 @@ const PostsActivity = () => {
         </Tabs>
 
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7098]" />
-            <Input
-              type="text"
-              placeholder="Search posts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-10 w-64 rounded-full bg-white border-[#6B7098]/20"
-            />
-          </div>
+          {searchQuery && (
+            <span className="text-sm text-[#6B7098]">Filtering by &quot;{searchQuery}&quot;</span>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="outline" size="icon" className="rounded-full border-[#6B7098]/20">

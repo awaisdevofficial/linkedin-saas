@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -35,7 +36,6 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { apiCalls } from '@/lib/api';
-import { OAUTH_BACKEND_URL } from '@/lib/config';
 import { toast } from 'sonner';
 
 type NotificationSettings = {
@@ -57,7 +57,7 @@ const defaultNotificationSettings: NotificationSettings = {
 const Settings = () => {
   const { user, session } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get('tab') || 'profile';
+  const tabFromUrl = searchParams.get('tab') || 'account';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(defaultNotificationSettings);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -73,17 +73,19 @@ const Settings = () => {
   const [jsessionId, setJsessionId] = useState('');
   const [linkedInStatus, setLinkedInStatus] = useState<'connected' | 'expired' | 'not_connected'>('not_connected');
   const [lastConnectedAt, setLastConnectedAt] = useState<string | null>(null);
+  const [lastHealthCheck, setLastHealthCheck] = useState<string | null>(null);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [cookieHelpOpen, setCookieHelpOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [accountSection, setAccountSection] = useState<string>('profile');
 
-  // Sync tab from URL (e.g. /dashboard/settings?tab=notifications)
+  // Sync tab from URL
   useEffect(() => {
-    const t = searchParams.get('tab') || 'profile';
-    const valid = ['profile', 'password', 'linkedin', 'notifications', 'danger'].includes(t);
-    setActiveTab(valid ? t : 'profile');
+    const t = searchParams.get('tab') || 'account';
+    const valid = ['account', 'danger'].includes(t);
+    setActiveTab(valid ? t : 'account');
   }, [searchParams]);
 
   useEffect(() => {
@@ -95,7 +97,7 @@ const Settings = () => {
         client.from('profiles').select('full_name, email, avatar_url').eq('id', user.id).maybeSingle(),
         client
           .from('linkedin_connections')
-          .select('li_at_cookie, jsessionid, is_active, cookie_status, last_connected_at')
+          .select('li_at_cookie, jsessionid, is_active, cookie_status, last_connected_at, last_health_check')
           .eq('user_id', user.id)
           .maybeSingle(),
         client
@@ -105,7 +107,7 @@ const Settings = () => {
           .maybeSingle(),
       ]);
       setProfile(profileRes.data as typeof profile);
-      const conn = connRes.data as { li_at_cookie?: string; jsessionid?: string; is_active?: boolean; cookie_status?: string; last_connected_at?: string } | null;
+      const conn = connRes.data as { li_at_cookie?: string; jsessionid?: string; is_active?: boolean; cookie_status?: string; last_connected_at?: string; last_health_check?: string } | null;
       if (conn?.is_active && (conn.cookie_status || '').toLowerCase() === 'active') {
         setLinkedInStatus('connected');
         setLastConnectedAt(conn.last_connected_at || null);
@@ -114,6 +116,7 @@ const Settings = () => {
       } else {
         setLinkedInStatus('not_connected');
       }
+      setLastHealthCheck(conn?.last_health_check || null);
       setLiAt(conn?.li_at_cookie || '');
       setJsessionId(conn?.jsessionid || '');
       const notif = notifRes.data as Partial<NotificationSettings> | null;
@@ -151,7 +154,7 @@ const Settings = () => {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    setSearchParams({ tab: value });
+    setSearchParams({ tab: value }, { replace: true });
   };
 
   const handleSaveNotificationSettings = async () => {
@@ -176,10 +179,6 @@ const Settings = () => {
     } finally {
       setSaving(null);
     }
-  };
-
-  const handleLinkedInOAuth = () => {
-    window.location.href = `${OAUTH_BACKEND_URL}/auth/linkedin`;
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -259,6 +258,7 @@ const Settings = () => {
         .eq('user_id', user.id);
       setLinkedInStatus('not_connected');
       setLastConnectedAt(null);
+      setLastHealthCheck(null);
       setLiAt('');
       setJsessionId('');
       setDisconnectDialogOpen(false);
@@ -280,21 +280,9 @@ const Settings = () => {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="bg-white">
-          <TabsTrigger value="profile" className="flex items-center gap-2">
+          <TabsTrigger value="account" className="flex items-center gap-2">
             <User className="w-4 h-4" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger value="password" className="flex items-center gap-2">
-            <Key className="w-4 h-4" />
-            Password
-          </TabsTrigger>
-          <TabsTrigger value="linkedin" className="flex items-center gap-2">
-            <Link2 className="w-4 h-4" />
-            LinkedIn
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="w-4 h-4" />
-            Notifications
+            Account
           </TabsTrigger>
           <TabsTrigger value="danger" className="flex items-center gap-2 text-red-600">
             <AlertTriangle className="w-4 h-4" />
@@ -302,335 +290,317 @@ const Settings = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile">
+        <TabsContent value="account" forceMount className="data-[state=inactive]:hidden">
           <Card className="card-shadow border-none">
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Update your personal details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center gap-6">
-                <Avatar className="w-20 h-20">
-                  <AvatarImage src={profile?.avatar_url} />
-                  <AvatarFallback>
-                    {(profile?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
+            <CardContent className="p-0">
+              <Accordion type="single" collapsible value={accountSection} onValueChange={(v) => v && setAccountSection(v)} className="w-full">
+                <AccordionItem value="profile" className="border-[#6B7098]/10 px-6">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-4">
+                    <User className="w-4 h-4 text-[#6B7098]" />
+                    Profile
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-6">
+                        <Avatar className="w-16 h-16">
+                          <AvatarImage src={profile?.avatar_url} />
+                          <AvatarFallback>
+                            {(profile?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                      <Separator />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Full Name</Label>
+                          <Input
+                            value={profile?.full_name || ''}
+                            onChange={(e) => setProfile((p) => ({ ...p, full_name: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Email</Label>
+                          <Input
+                            type="email"
+                            value={profile?.email || user?.email || ''}
+                            disabled
+                            className="bg-[#F6F8FC]"
+                          />
+                        </div>
+                      </div>
+                      <Button size="sm" className="bg-[#2D5AF6] hover:bg-[#1E4AD6]" onClick={handleSaveProfile} disabled={!!saving}>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </Button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
 
-              <Separator />
+                <AccordionItem value="password" className="border-[#6B7098]/10 px-6">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-4">
+                    <Key className="w-4 h-4 text-[#6B7098]" />
+                    Password
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-6">
+                    <div className="space-y-4">
+                      {passwordError && (
+                        <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{passwordError}</div>
+                      )}
+                      <form onSubmit={handleChangePassword} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Current password</Label>
+                          <div className="relative">
+                            <Input
+                              type={showCurrentPassword ? 'text' : 'password'}
+                              value={passwordForm.currentPassword}
+                              onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
+                              placeholder="Current password"
+                              className="pr-10 h-9"
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7098]"
+                            >
+                              {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>New password</Label>
+                          <div className="relative">
+                            <Input
+                              type={showNewPassword ? 'text' : 'password'}
+                              value={passwordForm.newPassword}
+                              onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
+                              placeholder="At least 8 characters"
+                              className="pr-10 h-9"
+                              required
+                              minLength={8}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowNewPassword(!showNewPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7098]"
+                            >
+                              {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Confirm new password</Label>
+                          <Input
+                            type="password"
+                            value={passwordForm.confirmPassword}
+                            onChange={(e) => setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                            placeholder="Confirm new password"
+                            className="h-9"
+                            required
+                          />
+                        </div>
+                        <Button type="submit" size="sm" className="bg-[#2D5AF6] hover:bg-[#1E4AD6]" disabled={!!saving}>
+                          <Save className="w-4 h-4 mr-2" />
+                          Change password
+                        </Button>
+                      </form>
+                      <p className="text-sm text-[#6B7098]">
+                        <Link to="/auth/forgot-password" className="text-[#2D5AF6] hover:underline font-medium">Forgot password?</Link>
+                      </p>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input
-                    value={profile?.full_name || ''}
-                    onChange={(e) =>
-                      setProfile((p) => ({ ...p, full_name: e.target.value }))
-                    }
-                  />
+                <AccordionItem value="linkedin" className="border-[#6B7098]/10 px-6">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-4">
+                    <Link2 className="w-4 h-4 text-[#6B7098]" />
+                    LinkedIn
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-6">
+                    <div className="space-y-5">
+                      <div className="rounded-xl border border-[#6366F1]/20 bg-[#EEF2FF]/50 p-4 text-sm text-[#10153E]">
+                        <p className="font-medium text-[#10153E] mb-1">Your account is safe</p>
+                        <p className="text-[#6B7098]">
+                          We never ask for your LinkedIn password. The cookies (li_at and JSESSIONID) are standard session tokens that only allow us to post and engage on your behalf while you’re connected. Your data is encrypted and we don’t share it with third parties. You can disconnect anytime in one click — your LinkedIn account stays under your control.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                <div className="rounded-lg border border-[#6B7098]/20 bg-[#F6F8FC]/50 p-3">
+                  <p className="text-xs font-medium text-[#6B7098] uppercase tracking-wide">Status</p>
+                  {linkedInStatus === 'connected' && (
+                    <Badge className="mt-1 bg-green-600 hover:bg-green-600">Connected</Badge>
+                  )}
+                  {linkedInStatus === 'expired' && (
+                    <Badge variant="secondary" className="mt-1 bg-amber-100 text-amber-800 border-amber-200">Session Expired</Badge>
+                  )}
+                  {linkedInStatus === 'not_connected' && (
+                    <Badge variant="secondary" className="mt-1 bg-[#6B7098]/10 text-[#6B7098]">Not Connected</Badge>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={profile?.email || user?.email || ''}
-                    disabled
-                    className="bg-[#F6F8FC]"
-                  />
+                <div className="rounded-lg border border-[#6B7098]/20 bg-[#F6F8FC]/50 p-3">
+                  <p className="text-xs font-medium text-[#6B7098] uppercase tracking-wide">Last connected</p>
+                  <p className="mt-1 text-[#10153E] font-medium">
+                    {lastConnectedAt ? new Date(lastConnectedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                  </p>
                 </div>
-              </div>
-
-              <Button
-                className="bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-                onClick={handleSaveProfile}
-                disabled={!!saving}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save Changes
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="password">
-          <Card className="card-shadow border-none">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#2D5AF6]/10 flex items-center justify-center">
-                  <Lock className="w-5 h-5 text-[#2D5AF6]" />
+                <div className="rounded-lg border border-[#6B7098]/20 bg-[#F6F8FC]/50 p-3">
+                  <p className="text-xs font-medium text-[#6B7098] uppercase tracking-wide">Last health check</p>
+                  <p className="mt-1 text-[#10153E] font-medium">
+                    {lastHealthCheck ? new Date(lastHealthCheck).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                  </p>
                 </div>
-                <div>
-                  <CardTitle>Password</CardTitle>
-                  <CardDescription>Change your password to sign in with email, or use LinkedIn</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {passwordError && (
-                <div className="p-3 rounded-xl bg-red-50 text-red-700 text-sm">{passwordError}</div>
-              )}
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Current password</Label>
-                  <div className="relative">
-                    <Input
-                      type={showCurrentPassword ? 'text' : 'password'}
-                      value={passwordForm.currentPassword}
-                      onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
-                      placeholder="Enter current password"
-                      className="pr-12"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7098]"
-                    >
-                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>New password</Label>
-                  <div className="relative">
-                    <Input
-                      type={showNewPassword ? 'text' : 'password'}
-                      value={passwordForm.newPassword}
-                      onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
-                      placeholder="At least 8 characters"
-                      className="pr-12"
-                      required
-                      minLength={8}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7098]"
-                    >
-                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Confirm new password</Label>
-                  <Input
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))}
-                    placeholder="Confirm new password"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="bg-[#2D5AF6] hover:bg-[#1E4AD6]" disabled={!!saving}>
-                  <Save className="w-4 h-4 mr-2" />
-                  Change password
-                </Button>
-              </form>
-              <Separator />
-              <p className="text-sm text-[#6B7098]">
-                Forgot your password?{' '}
-                <Link to="/auth/forgot-password" className="text-[#2D5AF6] hover:underline font-medium">
-                  Reset it here
-                </Link>
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="linkedin">
-          <Card className="card-shadow border-none">
-            <CardHeader>
-              <CardTitle>LinkedIn Connection</CardTitle>
-              <CardDescription>Connect your LinkedIn account to enable automated posting and engagement</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <Button
-                className="w-full h-12 rounded-full bg-[#0077B5] hover:bg-[#006097]"
-                onClick={handleLinkedInOAuth}
-              >
-                <Link2 className="w-5 h-5 mr-2" />
-                Connect with LinkedIn OAuth
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-[#6B7098]/20" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-[#6B7098]">Or paste cookies</span>
-                </div>
-              </div>
-
-              {/* Connection status */}
-              <div className="flex flex-wrap items-center gap-2">
                 {linkedInStatus === 'connected' && (
-                  <>
-                    <Badge className="bg-green-600 hover:bg-green-600">Connected</Badge>
-                    {lastConnectedAt && (
-                      <span className="text-sm text-[#6B7098]">
-                        Last connected: {new Date(lastConnectedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                      </span>
-                    )}
+                  <div className="flex items-end">
                     <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => setDisconnectDialogOpen(true)}>
                       <Unlink className="w-4 h-4 mr-1" />
                       Disconnect
                     </Button>
-                  </>
+                  </div>
                 )}
-                {linkedInStatus === 'expired' && (
-                  <>
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">Session Expired</Badge>
-                    <span className="text-sm text-[#6B7098]">Please reconnect</span>
-                  </>
-                )}
-                {linkedInStatus === 'not_connected' && (
-                  <Badge variant="secondary" className="bg-[#6B7098]/10 text-[#6B7098]">Not Connected</Badge>
-                )}
-              </div>
+                      </div>
 
-              <Collapsible open={cookieHelpOpen} onOpenChange={setCookieHelpOpen}>
-                <CollapsibleTrigger className="text-sm font-medium text-[#2D5AF6] hover:underline flex items-center gap-1">
-                  How to get your LinkedIn cookies →
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <ol className="mt-3 text-sm text-[#6B7098] list-decimal list-inside space-y-1 pl-1">
-                    <li>Open LinkedIn in your browser and make sure you&apos;re logged in</li>
-                    <li>Press F12 to open Developer Tools</li>
-                    <li>Go to the Application tab (Chrome) or Storage tab (Firefox)</li>
-                    <li>Click Cookies → https://www.linkedin.com</li>
-                    <li>Find li_at → copy the value</li>
-                    <li>Find JSESSIONID → copy the value (remove the quotes)</li>
-                    <li>Paste both values below and click Save</li>
-                  </ol>
-                </CollapsibleContent>
-              </Collapsible>
+                      <Collapsible open={cookieHelpOpen} onOpenChange={setCookieHelpOpen}>
+                        <CollapsibleTrigger className="text-sm font-medium text-[#2D5AF6] hover:underline flex items-center gap-1">
+                          How to get your LinkedIn cookies →
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <ol className="mt-3 text-sm text-[#6B7098] list-decimal list-inside space-y-1 pl-1">
+                            <li>Open LinkedIn in your browser and make sure you&apos;re logged in</li>
+                            <li>Press F12 to open Developer Tools</li>
+                            <li>Go to the Application tab (Chrome) or Storage tab (Firefox)</li>
+                            <li>Click Cookies → https://www.linkedin.com</li>
+                            <li>Find li_at → copy the value</li>
+                            <li>Find JSESSIONID → copy the value (remove the quotes)</li>
+                            <li>Paste both values below and click Save</li>
+                          </ol>
+                          <p className="mt-3 text-xs text-[#6B7098]">
+                            This is the same method many official browser extensions use. Your account is not at risk — we only use these values to schedule and publish posts you approve.
+                          </p>
+                        </CollapsibleContent>
+                      </Collapsible>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="li_at">li_at Cookie</Label>
-                  <Input
-                    id="li_at"
-                    type="text"
-                    placeholder="Paste your li_at value here"
-                    value={liAt}
-                    onChange={(e) => setLiAt(e.target.value)}
-                    className="font-mono text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="jsessionid">JSESSIONID Cookie</Label>
-                  <Input
-                    id="jsessionid"
-                    type="text"
-                    placeholder="Paste your JSESSIONID value here"
-                    value={jsessionId}
-                    onChange={(e) => setJsessionId(e.target.value)}
-                    className="font-mono text-sm"
-                  />
-                </div>
-                <Button
-                  className="w-full bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-                  onClick={handleSaveLinkedIn}
-                  disabled={!!saving}
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Connection
-                </Button>
-              </div>
+                      <p className="text-xs text-[#6B7098]">
+                        Paste the cookie values below. They are stored securely and used only for your connected session. Disconnect anytime from this page.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+                        <div className="space-y-1">
+                          <Label htmlFor="li_at" className="text-xs">li_at Cookie</Label>
+                          <Input
+                            id="li_at"
+                            type="text"
+                            placeholder="Paste li_at value"
+                            value={liAt}
+                            onChange={(e) => setLiAt(e.target.value)}
+                            className="h-8 font-mono text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="jsessionid" className="text-xs">JSESSIONID Cookie</Label>
+                          <Input
+                            id="jsessionid"
+                            type="text"
+                            placeholder="Paste JSESSIONID value"
+                            value={jsessionId}
+                            onChange={(e) => setJsessionId(e.target.value)}
+                            className="h-8 font-mono text-xs"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-[#2D5AF6] hover:bg-[#1E4AD6]"
+                        onClick={handleSaveLinkedIn}
+                        disabled={!!saving}
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Connection
+                      </Button>
 
-              {saveSuccess && (
-                <p className="text-sm text-green-600">LinkedIn connected successfully ✅</p>
-              )}
-              {saveError && (
-                <p className="text-sm text-red-600">{saveError}</p>
-              )}
+                      {saveSuccess && (
+                        <p className="text-sm text-green-600">LinkedIn connected successfully ✅</p>
+                      )}
+                      {saveError && (
+                        <p className="text-sm text-red-600">{saveError}</p>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="notifications" className="border-[#6B7098]/10 px-6">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-4">
+                    <Bell className="w-4 h-4 text-[#6B7098]" />
+                    Notifications
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between py-3 border-b border-[#6B7098]/10">
+                        <div>
+                          <p className="font-medium text-[#10153E] text-sm">Approval emails</p>
+                          <p className="text-xs text-[#6B7098]">When a post is ready for your approval</p>
+                        </div>
+                        <Switch
+                          checked={notificationSettings.approval_emails}
+                          onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, approval_emails: c }))}
+                          disabled={!!saving}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between py-3 border-b border-[#6B7098]/10">
+                        <div>
+                          <p className="font-medium text-[#10153E] text-sm">Publish emails</p>
+                          <p className="text-xs text-[#6B7098]">When a post is published</p>
+                        </div>
+                        <Switch
+                          checked={notificationSettings.publish_emails}
+                          onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, publish_emails: c }))}
+                          disabled={!!saving}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between py-3 border-b border-[#6B7098]/10">
+                        <div>
+                          <p className="font-medium text-[#10153E] text-sm">Weekly summary</p>
+                          <p className="text-xs text-[#6B7098]">Weekly digest</p>
+                        </div>
+                        <Switch
+                          checked={notificationSettings.weekly_summary}
+                          onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, weekly_summary: c }))}
+                          disabled={!!saving}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between py-3 border-b border-[#6B7098]/10">
+                        <div>
+                          <p className="font-medium text-[#10153E] text-sm">Cookie expired</p>
+                          <p className="text-xs text-[#6B7098]">When LinkedIn session expires</p>
+                        </div>
+                        <Switch
+                          checked={notificationSettings.cookie_expired_emails}
+                          onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, cookie_expired_emails: c }))}
+                          disabled={!!saving}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between py-3">
+                        <div>
+                          <p className="font-medium text-[#10153E] text-sm">System issues</p>
+                          <p className="text-xs text-[#6B7098]">Service alerts</p>
+                        </div>
+                        <Switch
+                          checked={notificationSettings.system_issue_emails}
+                          onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, system_issue_emails: c }))}
+                          disabled={!!saving}
+                        />
+                      </div>
+                      <Button size="sm" className="bg-[#2D5AF6] hover:bg-[#1E4AD6]" onClick={handleSaveNotificationSettings} disabled={!!saving}>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save preferences
+                      </Button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications">
-          <Card className="card-shadow border-none">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#6366F1]/10 flex items-center justify-center">
-                  <Bell className="w-5 h-5 text-[#6366F1]" />
-                </div>
-                <div>
-                  <CardTitle>Notification preferences</CardTitle>
-                  <CardDescription>Choose which emails and alerts you receive</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between py-3 border-b border-[#6B7098]/10">
-                <div>
-                  <p className="font-medium text-[#10153E]">Approval emails</p>
-                  <p className="text-sm text-[#6B7098]">When a post is ready for your approval</p>
-                </div>
-                <Switch
-                  checked={notificationSettings.approval_emails}
-                  onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, approval_emails: c }))}
-                  disabled={!!saving}
-                />
-              </div>
-              <div className="flex items-center justify-between py-3 border-b border-[#6B7098]/10">
-                <div>
-                  <p className="font-medium text-[#10153E]">Publish emails</p>
-                  <p className="text-sm text-[#6B7098]">When a post is published</p>
-                </div>
-                <Switch
-                  checked={notificationSettings.publish_emails}
-                  onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, publish_emails: c }))}
-                  disabled={!!saving}
-                />
-              </div>
-              <div className="flex items-center justify-between py-3 border-b border-[#6B7098]/10">
-                <div>
-                  <p className="font-medium text-[#10153E]">Weekly summary</p>
-                  <p className="text-sm text-[#6B7098]">Weekly digest of your activity</p>
-                </div>
-                <Switch
-                  checked={notificationSettings.weekly_summary}
-                  onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, weekly_summary: c }))}
-                  disabled={!!saving}
-                />
-              </div>
-              <div className="flex items-center justify-between py-3 border-b border-[#6B7098]/10">
-                <div>
-                  <p className="font-medium text-[#10153E]">Cookie expired</p>
-                  <p className="text-sm text-[#6B7098]">When your LinkedIn session expires</p>
-                </div>
-                <Switch
-                  checked={notificationSettings.cookie_expired_emails}
-                  onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, cookie_expired_emails: c }))}
-                  disabled={!!saving}
-                />
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-[#10153E]">System issues</p>
-                  <p className="text-sm text-[#6B7098]">Important service or system alerts</p>
-                </div>
-                <Switch
-                  checked={notificationSettings.system_issue_emails}
-                  onCheckedChange={(c) => setNotificationSettings((s) => ({ ...s, system_issue_emails: c }))}
-                  disabled={!!saving}
-                />
-              </div>
-              <Button
-                className="bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-                onClick={handleSaveNotificationSettings}
-                disabled={!!saving}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save preferences
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="danger">
+        <TabsContent value="danger" forceMount className="data-[state=inactive]:hidden">
           <Card className="card-shadow border-none border-red-200">
             <CardHeader>
               <div className="flex items-center gap-3">

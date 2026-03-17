@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   FileText,
   Clock,
@@ -28,6 +28,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { InspirationalQuote } from '@/components/InspirationalQuote';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -95,6 +96,8 @@ const fetchAll = async (client: SupabaseClient, userId: string) => {
 };
 
 const DashboardHome = () => {
+  const [searchParams] = useSearchParams();
+  const searchQuery = (searchParams.get('q') ?? '').toLowerCase();
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [engagementLogs, setEngagementLogs] = useState<EngagementLog[]>([]);
@@ -277,6 +280,16 @@ const DashboardHome = () => {
     return items.sort((a, b) => b.ts - a.ts).slice(0, 8);
   }, [engagementLogs, commentReplies, posts]);
 
+  const filteredBySearch = useMemo(() => {
+    if (!searchQuery.trim()) return { activity: combinedActivity, postsForList: posts.slice(0, 5) };
+    const q = searchQuery.trim();
+    const activity = combinedActivity.filter((a) => a.message.toLowerCase().includes(q));
+    const postsForList = posts
+      .filter((p) => (p.hook || '').toLowerCase().includes(q) || (p.content || '').toLowerCase().includes(q))
+      .slice(0, 5);
+    return { activity, postsForList };
+  }, [combinedActivity, posts, searchQuery]);
+
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       published: 'bg-green-100 text-green-700 hover:bg-green-100',
@@ -328,6 +341,8 @@ const DashboardHome = () => {
           <TooltipContent side="bottom" sideOffset={6}>Create a new LinkedIn post</TooltipContent>
         </UITooltip>
       </div>
+
+      <InspirationalQuote variant="card" className="max-w-xl" />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
@@ -451,10 +466,12 @@ const DashboardHome = () => {
               <div>
                 <p className="text-xs font-medium text-[#6B7098] uppercase tracking-wider mb-3">Activity Feed</p>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {combinedActivity.length === 0 ? (
-                    <p className="text-sm text-[#6B7098]">No activity yet.</p>
+                  {filteredBySearch.activity.length === 0 ? (
+                    <p className="text-sm text-[#6B7098]">
+                      {searchQuery ? 'No matching activity.' : 'No activity yet.'}
+                    </p>
                   ) : (
-                    combinedActivity.map((activity) => (
+                    filteredBySearch.activity.map((activity) => (
                       <div
                         key={activity.id}
                         className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-[#F6F8FC] transition-colors"
@@ -479,10 +496,12 @@ const DashboardHome = () => {
                   </Link>
                 </div>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {posts.length === 0 ? (
-                    <p className="text-sm text-[#6B7098]">No posts yet.</p>
+                  {filteredBySearch.postsForList.length === 0 ? (
+                    <p className="text-sm text-[#6B7098]">
+                      {searchQuery ? 'No matching posts.' : 'No posts yet.'}
+                    </p>
                   ) : (
-                    posts.slice(0, 5).map((post) => (
+                    filteredBySearch.postsForList.map((post) => (
                       <div
                         key={post.id}
                         className="flex items-center justify-between p-2.5 rounded-lg bg-[#F6F8FC] hover:bg-[#EEF2F7] transition-colors"

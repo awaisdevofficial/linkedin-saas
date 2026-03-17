@@ -143,34 +143,19 @@ export const apiCalls = {
   getFeatureFlags: (token: string) =>
     api<Record<string, { enabled: boolean; messageType: string; message: string }>>('/api/feature-flags', { token }),
 
-  getMyInvoices: (token: string) =>
-    api<AdminInvoice[]>('/api/invoices', { token }),
-
-  /** Fetches invoice as HTML for view/print. Returns raw HTML string. */
-  getInvoiceHtml: async (token: string, invoiceId: string): Promise<string> => {
-    const res = await fetch(`${API_URL}/api/invoices/${invoiceId}/html`, {
-      headers: { Authorization: `Bearer ${token}` },
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Invoice not found');
-    return res.text();
-  },
-
+  getBillingActivity: (token: string) =>
+    api<BillingActivityResponse>('/api/billing/activity', { token }),
 };
 
-export type AdminInvoice = {
-  id: string;
-  user_id: string;
-  amount: number;
-  currency: string;
-  description: string | null;
-  status: string;
-  due_date: string | null;
-  paid_at: string | null;
-  invoice_number: string | null;
-  created_at: string;
-  visible_to_user?: boolean;
-  email_sent_at?: string | null;
+export type BillingActivityEntry = {
+  type: 'plan_activated' | 'plan_canceled' | 'plan_revoked' | 'plan_updated';
+  plan: string;
+  status?: string;
+  at: string;
+  description: string;
 };
 
-export type AdminInvoiceRow = AdminInvoice & { profiles?: { email: string; full_name: string } | null };
+export type BillingActivityResponse = {
+  subscription: { plan: string; status: string; current_period_end?: string; trial_ends_at?: string | null; trial_expired?: boolean };
+  activity: BillingActivityEntry[];
+};

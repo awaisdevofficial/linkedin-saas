@@ -16,11 +16,10 @@ import PostsActivity from './pages/dashboard/PostsActivity';
 import CommentsActivity from './pages/dashboard/CommentsActivity';
 import AutomationSettings from './pages/dashboard/AutomationSettings';
 import Settings from './pages/dashboard/Settings';
-import Invoices from './pages/dashboard/Invoices';
+import Billing from './pages/dashboard/Billing';
 import BannedPage from './pages/Banned';
 import ExpiredPage from './pages/Expired';
 import PricingPage from './pages/PricingPage';
-import BillingPage from './pages/Billing';
 import BillingSuccess from './pages/BillingSuccess';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -50,14 +49,6 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
-            <Route
-              path="/billing"
-              element={
-                <ProtectedRoute>
-                  <BillingPage />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/billing/success"
               element={
@@ -105,7 +96,7 @@ function App() {
               <Route path="posts/activity" element={<PostsActivity />} />
               <Route path="comments/activity" element={<CommentsActivity />} />
               <Route path="automation" element={<AutomationSettings />} />
-              <Route path="invoices" element={<Invoices />} />
+              <Route path="billing" element={<Billing />} />
               <Route path="settings" element={<Settings />} />
             </Route>
 
@@ -124,6 +115,7 @@ function App() {
             <Route path="/Refund" element={<Navigate to="/refund-policy" replace />} />
             <Route path="/refund" element={<Navigate to="/refund-policy" replace />} />
             <Route path="/refund&policy" element={<Navigate to="/refund-policy" replace />} />
+            <Route path="/billing" element={<Navigate to="/dashboard/billing" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
 

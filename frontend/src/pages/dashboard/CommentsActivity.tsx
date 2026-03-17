@@ -5,7 +5,6 @@ import {
   Reply,
   CheckCircle,
   XCircle,
-  Search,
   Linkedin,
   Globe,
   MoreHorizontal,
@@ -25,6 +24,7 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
@@ -91,12 +91,13 @@ type ActivityItem = {
 };
 
 const CommentsActivity = () => {
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') ?? '';
   const { user } = useAuth();
   const [engagementLogs, setEngagementLogs] = useState<EngagementLog[]>([]);
   const [commentReplies, setCommentReplies] = useState<CommentReply[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [viewItem, setViewItem] = useState<ActivityItem | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -376,16 +377,9 @@ const CommentsActivity = () => {
         </Tabs>
 
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7098]" />
-            <Input
-              type="text"
-              placeholder="Search activity..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-10 w-64 rounded-full bg-white border-[#6B7098]/20"
-            />
-          </div>
+          {searchQuery && (
+            <span className="text-sm text-[#6B7098]">Filtering by &quot;{searchQuery}&quot;</span>
+          )}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}

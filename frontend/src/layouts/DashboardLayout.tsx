@@ -11,7 +11,6 @@ import {
   LogOut,
   Menu,
   ChevronDown,
-  FileText,
   Settings,
   Crown,
   CreditCard,
@@ -43,8 +42,7 @@ const navItems: { icon: typeof LayoutDashboard; label: string; href: string; too
   { icon: Calendar, label: 'Posts', href: '/dashboard/posts/activity', tooltip: 'Manage and schedule posts', flagKey: 'posts_activity' },
   { icon: MessageSquare, label: 'Comments', href: '/dashboard/comments/activity', tooltip: 'View and reply to comments', flagKey: 'comments_activity' },
   { icon: Zap, label: 'Activity', href: '/dashboard/automation', tooltip: 'Engagement and schedule settings', flagKey: 'automation' },
-  { icon: FileText, label: 'Invoices', href: '/dashboard/invoices', tooltip: 'Your invoices' },
-  { icon: Crown, label: 'Billing', href: '/billing', tooltip: 'Upgrade to Pro or manage subscription' },
+  { icon: Crown, label: 'Billing', href: '/dashboard/billing', tooltip: 'Upgrade to Pro or manage subscription' },
 ];
 
 function pathToFlagKey(pathname: string): string | null {
@@ -68,11 +66,29 @@ function DashboardLayoutInner() {
     : 0;
   const welcomeTrialShown = useRef(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const urlQ = searchParams.get('q') ?? '';
+  const [searchInput, setSearchInput] = useState(urlQ);
   const [connectionStatus, setConnectionStatus] = useState<'ok' | 'missing' | 'needsCookies' | 'expired'>('missing');
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const { notifications, loading: notificationsLoading, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+
+  useEffect(() => {
+    setSearchInput(urlQ);
+  }, [urlQ]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      const next = new URLSearchParams(searchParams);
+      if (value.trim()) next.set('q', value.trim());
+      else next.delete('q');
+      setSearchParams(next, { replace: true });
+      searchDebounceRef.current = null;
+    }, 300);
+  };
 
   useEffect(() => {
     if (welcomeTrialShown.current) return;
@@ -230,31 +246,30 @@ function DashboardLayoutInner() {
         {!trial_expired && trial_ends_at && daysLeft <= 3 && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800 shrink-0">
             ⏳ {daysLeft} day{daysLeft !== 1 ? 's' : ''} left on your free trial —{' '}
-            <Link to="/billing" className="font-semibold underline ml-1">
+            <Link to="/dashboard/billing" className="font-semibold underline ml-1">
               Upgrade to Pro
             </Link>
           </div>
         )}
         <header className="bg-white border-b border-[#6B7098]/10 px-4 sm:px-6 py-4 shrink-0">
           <div className="flex items-center justify-between gap-4">
-            <Sheet>
-              <SheetTrigger asChild className="lg:hidden">
-                <Button variant="ghost" size="icon">
-                  <Menu className="w-5 h-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-64 p-0 bg-white">
-                <SidebarContent />
-              </SheetContent>
-            </Sheet>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
 
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7098]" />
               <Input
                 type="text"
                 placeholder="Search posts, comments..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchInput}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-10 h-10 rounded-full bg-[#F6F8FC] border-none focus:ring-2 focus:ring-[#6366F1]/20"
               />
             </div>
@@ -345,7 +360,7 @@ function DashboardLayoutInner() {
                   </div>
                   <div className="border-t border-[#6B7098]/10 p-2">
                     <DropdownMenuItem asChild>
-                      <Link to="/dashboard/settings?tab=notifications" className="cursor-pointer">Notification preferences</Link>
+                      <Link to="/dashboard/settings?tab=account" className="cursor-pointer">Notification preferences</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link to="/dashboard/posts/activity" className="cursor-pointer">View posts activity</Link>
@@ -374,7 +389,7 @@ function DashboardLayoutInner() {
                     <Link to="/dashboard/settings">Settings</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link to="/billing" className="flex items-center gap-2">
+                    <Link to="/dashboard/billing" className="flex items-center gap-2">
                       <CreditCard className="w-4 h-4" />
                       Billing
                     </Link>
@@ -397,14 +412,14 @@ function DashboardLayoutInner() {
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm text-amber-800">
                 {connectionStatus === 'missing' &&
-                  'Connect LinkedIn so posting and engagement work: add your li_at and JSESSIONID cookies in Settings or use the LinkedIn OAuth button.'}
+                  'Connect LinkedIn so posting and engagement work: add your li_at and JSESSIONID cookies in Settings. We never store your password — only session tokens, and you can disconnect anytime.'}
                 {connectionStatus === 'needsCookies' &&
-                  'Your LinkedIn connection is incomplete. Add both li_at and JSESSIONID cookies in Settings so publishing and engagement work reliably.'}
+                  'Your LinkedIn connection is incomplete. Add both li_at and JSESSIONID cookies in Settings so publishing and engagement work reliably. Your data is stored securely and used only for your account.'}
                 {connectionStatus === 'expired' &&
-                  'Your LinkedIn session cookie has expired. Paste a fresh li_at and JSESSIONID in Settings to resume posting and engagement.'}
+                  'Your LinkedIn session cookie has expired. Paste a fresh li_at and JSESSIONID in Settings to resume posting and engagement. This is safe and your account stays under your control.'}
               </p>
               <Link
-                to="/dashboard/settings?tab=linkedin"
+                to="/dashboard/settings?tab=account"
                 className="shrink-0 text-sm text-amber-800 font-medium hover:underline"
               >
                 Fix in Settings →

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Button } from '@/components/ui/button';
+import { InspirationalQuote } from '@/components/InspirationalQuote';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -74,9 +75,12 @@ const FinalCTA = () => {
             <br />
             LinkedIn presence?
           </h2>
-          <p className="cta-subtext text-base sm:text-lg text-[#6B7098] mb-8 sm:mb-10">
+          <p className="cta-subtext text-base sm:text-lg text-[#6B7098] mb-4">
             Start free. No credit card required.
           </p>
+          <div className="cta-subtext mb-8 sm:mb-10">
+            <InspirationalQuote variant="inline" className="max-w-md mx-auto" />
+          </div>
           <div className="cta-buttons flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4">
             <Link to="/auth/signup" className="w-full sm:w-auto">
               <Button

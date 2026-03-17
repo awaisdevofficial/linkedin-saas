@@ -100,5 +100,78 @@ router.get('/subscription', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/billing/activity — subscription + billing activity log
+router.get('/activity', authenticate, async (req, res) => {
+  try {
+    const { data: subRows, error: subErr } = await supabase
+      .from('subscriptions')
+      .select('plan, status, current_period_end, updated_at')
+      .eq('user_id', req.user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (subErr) throw subErr;
+    const sub = subRows?.[0] ?? null;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('trial_ends_at')
+      .eq('id', req.user.id)
+      .single();
+    const trial_ends_at = profile?.trial_ends_at ?? null;
+    const trial_expired = trial_ends_at ? new Date(trial_ends_at) < new Date() : true;
+
+    const subscription = {
+      ...(sub || { plan: 'free', status: 'inactive' }),
+      ...(sub ? { current_period_end: sub.current_period_end } : {}),
+      trial_ends_at,
+      trial_expired,
+    };
+
+    const activity = [];
+    if (sub?.updated_at) {
+      const plan = sub.plan || 'pro';
+      const status = sub.status || 'inactive';
+      if (status === 'active' || status === 'trialing') {
+        activity.push({
+          type: 'plan_activated',
+          plan,
+          status,
+          at: sub.updated_at,
+          description: `${plan === 'pro' ? 'Pro' : plan} plan activated`,
+        });
+      } else if (status === 'canceled') {
+        activity.push({
+          type: 'plan_canceled',
+          plan,
+          status,
+          at: sub.updated_at,
+          description: 'Subscription canceled',
+        });
+      } else if (status === 'revoked') {
+        activity.push({
+          type: 'plan_revoked',
+          plan,
+          at: sub.updated_at,
+          description: 'Subscription ended',
+        });
+      } else {
+        activity.push({
+          type: 'plan_updated',
+          plan,
+          status,
+          at: sub.updated_at,
+          description: `Plan updated to ${plan}`,
+        });
+      }
+    }
+
+    return res.json({ subscription, activity });
+  } catch (err) {
+    console.error('[Polar] billing activity error:', err);
+    return res.status(500).json({ error: 'Failed to load billing activity' });
+  }
+});
+
 export default router;
 
