@@ -608,14 +608,52 @@ export async function getUsersWithAutoReplyEnabled() {
     if (setErr) return [];
 
     const settingsByUser = new Map((settingsRows || []).map((s) => [s.user_id, s]));
-    const result = [];
+
+    // Only allow Pro/trialing users to be processed by the scheduled reply job.
+    // This protects against stale `auto_replying=true` rows after cancellation/expiration.
+    const userConfigById = new Map();
     for (const c of conns) {
       const settings = settingsByUser.get(c.user_id);
       if (!settings) continue;
       if (settings.auto_replying !== true) continue;
-      result.push({
-        user_id: c.user_id,
+
+      userConfigById.set(c.user_id, {
         person_urn: c.person_urn || '',
+        settings,
+      });
+    }
+
+    const candidateUserIds = Array.from(userConfigById.keys());
+    if (candidateUserIds.length === 0) return [];
+
+    const { data: subsRows, error: subErr } = await supabase
+      .from('subscriptions')
+      .select('user_id, plan, status, updated_at')
+      .in('user_id', candidateUserIds);
+
+    if (subErr) return [];
+
+    const latestSubByUser = new Map();
+    (subsRows || [])
+      .slice()
+      .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
+      .forEach((row) => {
+        if (!latestSubByUser.has(row.user_id)) latestSubByUser.set(row.user_id, row);
+      });
+
+    const result = [];
+    for (const [userId, cfg] of userConfigById.entries()) {
+      const sub = latestSubByUser.get(userId);
+      const plan = sub?.plan || 'free';
+      const status = sub?.status || 'inactive';
+      const allowed = plan === 'pro' && (status === 'active' || status === 'trialing');
+
+      if (!allowed) continue;
+
+      const settings = cfg.settings;
+      result.push({
+        user_id: userId,
+        person_urn: cfg.person_urn,
         comment_prompt: settings.comment_prompt ?? null,
         active_days: settings.active_days ?? [],
         active_start_time: (settings.active_start_time ?? '08:00').toString().slice(0, 5),
@@ -624,6 +662,7 @@ export async function getUsersWithAutoReplyEnabled() {
         reply_webhook_last_sent_at: settings.reply_webhook_last_sent_at ?? null,
       });
     }
+
     return result;
   } catch (e) {
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'getUsersWithAutoReplyEnabled', error: e.message }));

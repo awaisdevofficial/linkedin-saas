@@ -25,17 +25,17 @@ const plans = [
   },
   {
     name: 'Pro',
-    price: 'Contact',
-    period: '',
+    price: '$49',
+    period: '/month',
     description: 'Extended access and support',
     features: [
       'Everything in Free',
       'Extended post generation',
       'Image/video caption tools (with your API key)',
-      'Invoices and billing via admin',
-      'Email support',
+      'LinkedIn auto-reply automation (Pro)',
+      '3-day free trial + self-serve billing',
     ],
-    cta: 'Contact for pricing',
+    cta: 'Start 3-day free trial',
     ctaVariant: 'outline' as const,
     popular: false,
     icon: Users,
@@ -140,6 +140,16 @@ const PricingPage = () => {
                           ? 'bg-[#6366F1] hover:bg-[#4F46E5] text-white'
                           : 'border-[#6B7098]/30 hover:bg-[#F6F8FC] text-[#10153E]'
                       }`}
+                    >
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                ) : plan.name === 'Pro' ? (
+                  <Link to="/billing" className="block">
+                    <Button
+                      variant={plan.ctaVariant}
+                      size="lg"
+                      className="w-full h-12 rounded-full text-base font-medium border-[#6B7098]/30 hover:bg-[#F6F8FC] text-[#10153E]"
                     >
                       {plan.cta}
                     </Button>

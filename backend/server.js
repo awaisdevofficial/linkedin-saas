@@ -8,6 +8,8 @@ import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 import adminRoutes from './src/routes/admin.routes.js';
+import webhooksRouter from './src/routes/webhooks.js';
+import billingRouter from './src/routes/billing.js';
 import { logger } from './src/utils/logger.js';
 import { invoiceFullHtml } from './src/templates/email-templates.js';
 
@@ -38,6 +40,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(cookieParser());
+app.use('/api/webhooks', webhooksRouter); // must be mounted before express.json() for signature verification
 app.use(express.json());
 
 // ——— Log every HTTP request: method, path, status, duration, body (sanitized) ———
@@ -576,6 +579,7 @@ async function apiAuthGuard(req, res, next) {
   next();
 }
 app.use('/api', apiAuthGuard);
+app.use('/api/billing', billingRouter);
 
 // GET /api/feature-flags — which dashboard pages are enabled and what message to show when disabled
 app.get('/api/feature-flags', async (req, res) => {
@@ -1141,6 +1145,31 @@ app.post('/api/automation/trigger-reply-comments', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Enforce Pro subscription for auto-reply automation.
+    // Free users (or canceled/expired subs) are blocked from triggering this job.
+    const { data: subRows, error: subErr } = await supabaseAdmin
+      .from('subscriptions')
+      .select('plan, status')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (subErr) {
+      logger.api('subscription_check_error', { error: subErr?.message });
+      return res.status(500).json({ error: 'Server error' });
+    }
+    const sub = subRows?.[0] ?? null;
+    const plan = sub?.plan || 'free';
+    const status = sub?.status || 'inactive';
+    const allowed = plan === 'pro' && (status === 'active' || status === 'trialing');
+    if (!allowed) {
+      return res.status(403).json({
+        error: 'upgrade_required',
+        required: 'pro',
+        current: plan,
+      });
+    }
+
     const payload = req.body?.payload ?? req.body;
     if (!payload || payload.user_id !== user.id) {
       return res.status(400).json({ error: 'Invalid payload or user_id mismatch' });

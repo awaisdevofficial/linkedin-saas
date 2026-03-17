@@ -28,6 +28,8 @@ import AdminInvoices from './pages/admin/AdminInvoices';
 import AdminLogs from './pages/admin/AdminLogs';
 import AdminFeatureFlags from './pages/admin/AdminFeatureFlags';
 import PricingPage from './pages/PricingPage';
+import BillingPage from './pages/Billing';
+import BillingSuccess from './pages/BillingSuccess';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import RefundPolicy from './pages/RefundPolicy';
@@ -56,6 +58,22 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route
+              path="/billing"
+              element={
+                <ProtectedRoute>
+                  <BillingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/billing/success"
+              element={
+                <ProtectedRoute>
+                  <BillingSuccess />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />

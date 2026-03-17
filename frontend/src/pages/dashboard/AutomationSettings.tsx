@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { apiCalls } from '@/lib/api';
 import { toast } from 'sonner';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const niches = ['Tech', 'Marketing', 'Finance', 'Sales', 'HR', 'AI', 'Custom'];
 
@@ -54,6 +55,10 @@ const AutomationSettings = () => {
   const [kieKeyPaid, setKieKeyPaid] = useState<boolean | null>(null);
   const [likeCommentLoading, setLikeCommentLoading] = useState(false);
   const [replyJobLoading, setReplyJobLoading] = useState(false);
+  const { subscription, loading: subLoading } = useSubscription();
+
+  const isPro =
+    subscription?.plan === 'pro' && (subscription?.status === 'active' || subscription?.status === 'trialing');
 
   useEffect(() => {
     if (!supabase || !user) {
@@ -717,12 +722,25 @@ const AutomationSettings = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-0">
+              {subLoading ? null : !isPro ? (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                  Auto-reply to comments is a Pro feature.{' '}
+                  <a href="/billing" className="font-semibold underline">
+                    Upgrade
+                  </a>
+                  .
+                </div>
+              ) : null}
               <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
                 <div>
                   <Label className="text-sm font-medium text-[#334155] cursor-pointer">Auto Reply to Comments</Label>
                   <p className="text-xs text-[#64748b] mt-0.5">Automatically reply to comments on your own posts (runs on schedule when enabled)</p>
                 </div>
-                <Switch checked={engageSettings?.auto_replying === true} onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_replying: checked }))} disabled={!!saving} />
+                <Switch
+                  checked={engageSettings?.auto_replying === true}
+                  onCheckedChange={(checked) => setEngageSettings((s) => ({ ...s, auto_replying: checked }))}
+                  disabled={!!saving || subLoading || !isPro}
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-[#334155]">Run reply-to-comments every</Label>
@@ -754,7 +772,7 @@ const AutomationSettings = () => {
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={replyJobLoading || !!saving || engageSettings?.auto_replying !== true}
+                  disabled={replyJobLoading || !!saving || engageSettings?.auto_replying !== true || subLoading || !isPro}
                   className="rounded-lg border-[#e2e8f0]"
                   onClick={async () => {
                     if (!supabase || !user || !accessToken) return;
