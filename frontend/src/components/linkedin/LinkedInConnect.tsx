@@ -1,19 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Linkedin, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Linkedin, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
+import { API_URL } from '@/lib/config';
 
-const CHROME_EXTENSION_URL = 'https://chrome.google.com/webstore/detail/postora/EXTENSION_ID_PLACEHOLDER';
-
-export type ConnectState =
-  | 'checking'
-  | 'no_extension'
-  | 'idle'
-  | 'loading'
-  | 'connected'
-  | 'error';
+export type ConnectState = 'idle' | 'waiting' | 'connected' | 'error';
 
 export interface LinkedInConnectProps {
   onConnected?: () => void;
@@ -26,26 +19,91 @@ type ConnectionRow = {
   last_connected_at?: string | null;
 } | null;
 
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_DURATION_MS = 120000;
+
+function buildBookmarklet(apiBaseUrl: string, jwt: string): string {
+  const safeUrl = apiBaseUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const safeToken = jwt.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+  const script = [
+    "javascript:(function(){",
+    "var li_at=document.cookie.split(';').find(function(c){return c.trim().indexOf('li_at=')===0;});",
+    "var li_at_val=li_at?li_at.split('=')[1].trim():null;",
+    "var js=document.cookie.split(';').find(function(c){return c.trim().indexOf('JSESSIONID=')===0;});",
+    "var js_val=js?js.split('=').slice(1).join('=').trim().replace(/\"/g,''):null;",
+    "if(!li_at_val){alert('Please log into LinkedIn first, then click this again.');return;}",
+    "fetch('" + safeUrl + "/api/linkedin/save-cookies',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer " + safeToken + "'},body:JSON.stringify({li_at:li_at_val,jsessionid:js_val})})",
+    ".then(function(r){return r.json();})",
+    ".then(function(){alert('LinkedIn connected to POSTORA ✅ You can go back now.');})",
+    ".catch(function(){alert('Connection failed. Please try again.');});",
+    "})();"
+  ].join('');
+  return script;
+}
+
 export function LinkedInConnect({ onConnected, showTitle = true }: LinkedInConnectProps) {
   const { user } = useAuth();
-  const [state, setState] = useState<ConnectState>('checking');
+  const [state, setState] = useState<ConnectState>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [lastConnectedAt, setLastConnectedAt] = useState<string | null>(null);
-  const [sessionExpiredNote, setSessionExpiredNote] = useState(false);
+  const [bookmarkletHref, setBookmarkletHref] = useState<string>('');
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollStartRef = useRef<number>(0);
 
   const resetToIdle = useCallback(() => {
     setState('idle');
     setErrorMessage('');
-    setSessionExpiredNote(false);
   }, []);
 
+  // Build bookmarklet when we have session
   useEffect(() => {
     if (!supabase || !user) return;
-
     let mounted = true;
-    const client = supabase;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted || !session?.access_token) return;
+      const apiBaseUrl = API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const href = buildBookmarklet(apiBaseUrl, session.access_token);
+      if (mounted) setBookmarkletHref(href);
+    })();
+    return () => { mounted = false; };
+  }, [user]);
 
-    const run = async () => {
+  // On mount: check existing connection
+  useEffect(() => {
+    if (!supabase || !user) return;
+    let mounted = true;
+    (async () => {
+      const { data: row } = await supabase
+        .from('linkedin_connections')
+        .select('is_active, cookie_status, last_connected_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const conn = row as ConnectionRow;
+      if (!mounted) return;
+      if (conn?.is_active && (conn.cookie_status || '').toLowerCase() === 'active') {
+        setState('connected');
+        setLastConnectedAt(conn.last_connected_at || null);
+        return;
+      }
+      setState('idle');
+    })();
+    return () => { mounted = false; };
+  }, [user]);
+
+  // Poll when idle or waiting (max 2 min)
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !user || (state !== 'idle' && state !== 'waiting')) return;
+    pollStartRef.current = Date.now();
+
+    const poll = async () => {
+      if (Date.now() - pollStartRef.current > POLL_MAX_DURATION_MS) {
+        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+        return;
+      }
       const { data: row } = await client
         .from('linkedin_connections')
         .select('is_active, cookie_status, last_connected_at')
@@ -53,173 +111,28 @@ export function LinkedInConnect({ onConnected, showTitle = true }: LinkedInConne
         .maybeSingle();
 
       const conn = row as ConnectionRow;
-      if (mounted && conn?.is_active && (conn.cookie_status || '').toLowerCase() === 'active') {
-        setState('connected');
+      if (conn?.is_active && (conn.cookie_status || '').toLowerCase() === 'active') {
+        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
         setLastConnectedAt(conn.last_connected_at || null);
-        return;
-      }
-      if (mounted && conn && (conn.cookie_status || '').toLowerCase() !== 'active') {
-        setState('idle');
-        setLastConnectedAt(null);
-        setSessionExpiredNote(true);
-        return;
-      }
-
-      await new Promise((r) => setTimeout(r, 500));
-      if (!mounted) return;
-      const hasExtension = typeof window !== 'undefined' && !!(window as unknown as { POSTORA_EXTENSION_INSTALLED?: boolean }).POSTORA_EXTENSION_INSTALLED;
-      if (hasExtension) {
-        setState('idle');
-        setSessionExpiredNote(false);
-      } else {
-        setState('no_extension');
+        setState('connected');
+        window.dispatchEvent(new Event('linkedin-connection-updated'));
+        onConnected?.();
       }
     };
 
-    run();
+    poll();
+    pollTimerRef.current = setInterval(poll, POLL_INTERVAL_MS);
     return () => {
-      mounted = false;
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
     };
-  }, [user]);
+  }, [user, state, onConnected]);
 
-  const handleConnect = useCallback(() => {
-    setState('loading');
-    setErrorMessage('');
-
-    const timeoutId = window.setTimeout(() => {
-      setState('error');
-      setErrorMessage('Could not reach the POSTORA extension. Please refresh the page and try again.');
-    }, 10_000);
-
-    const handler = async (event: MessageEvent) => {
-      if (event.data?.type !== 'POSTORA_COOKIES_RESULT') return;
-      window.clearTimeout(timeoutId);
-      window.removeEventListener('message', handler);
-
-      const res = event.data as { success?: boolean; error?: string; li_at?: string; jsessionid?: string | null };
-      if (res.success === false) {
-        if (res.error === 'not_logged_in') {
-          setState('error');
-          setErrorMessage('Please log into LinkedIn in your browser and try again.');
-          return;
-        }
-        if (res.error === 'extension_error') {
-          setState('error');
-          setErrorMessage('Something went wrong. Try reinstalling the POSTORA extension.');
-          return;
-        }
-        setState('error');
-        setErrorMessage(res.error || 'Something went wrong.');
-        return;
-      }
-
-      if (res.success !== true || !res.li_at || !supabase || !user) {
-        setState('error');
-        setErrorMessage('Invalid response from extension.');
-        return;
-      }
-
-      const { error } = await supabase.from('linkedin_connections').upsert(
-        {
-          user_id: user.id,
-          li_at_cookie: res.li_at,
-          jsessionid: res.jsessionid ?? null,
-          access_token: 'cookie-auth',
-          is_active: true,
-          last_connected_at: new Date().toISOString(),
-          last_tested_at: new Date().toISOString(),
-          cookie_status: 'active',
-        },
-        { onConflict: 'user_id' }
-      );
-
-      if (error) {
-        setState('error');
-        setErrorMessage(error.message);
-        return;
-      }
-
-      setLastConnectedAt(new Date().toISOString());
-      setState('connected');
-      window.dispatchEvent(new Event('linkedin-connection-updated'));
-      onConnected?.();
-    };
-
-    window.addEventListener('message', handler);
-    window.postMessage({ type: 'POSTORA_GET_COOKIES' }, '*');
-  }, [user, onConnected]);
-
-  if (state === 'checking') {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-[#6B7098]" />
-      </div>
-    );
-  }
-
-  if (state === 'no_extension') {
-    return (
-      <div className="space-y-4">
-        {showTitle && (
-          <h3 className="text-lg font-semibold text-[#10153E]">Connect Your LinkedIn Account</h3>
-        )}
-        <Alert className="border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-600">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Connect Your LinkedIn Account</AlertTitle>
-          <AlertDescription>
-            <p className="mb-3">POSTORA uses a lightweight browser extension to securely link your LinkedIn session — no password required.</p>
-            <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => window.open(CHROME_EXTENSION_URL, '_blank', 'noopener,noreferrer')}
-            >
-              Add to Chrome
-            </Button>
-            <p className="mt-2 text-xs text-amber-800/90">(free, takes 10 seconds)</p>
-            <p className="mt-1 text-xs text-amber-800/90">After installing, refresh this page to continue.</p>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (state === 'idle') {
-    return (
-      <div className="space-y-4">
-        {showTitle && (
-          <h3 className="text-lg font-semibold text-[#10153E]">Connect Your LinkedIn Account</h3>
-        )}
-        {sessionExpiredNote && (
-          <p className="text-sm text-[#6B7098]">
-            Your LinkedIn session expired, please reconnect.
-          </p>
-        )}
-        <p className="text-sm text-[#6B7098]">
-          Make sure you&apos;re logged into LinkedIn in this browser.
-        </p>
-        <Button
-          className="w-full h-12 rounded-full bg-[#0A66C2] hover:bg-[#004182] text-white"
-          onClick={handleConnect}
-        >
-          <Linkedin className="w-5 h-5 mr-2" />
-          Connect LinkedIn
-        </Button>
-      </div>
-    );
-  }
-
-  if (state === 'loading') {
-    return (
-      <div className="space-y-4">
-        <Button
-          className="w-full h-12 rounded-full bg-[#0A66C2] text-white"
-          disabled
-        >
-          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-          Linking your account...
-        </Button>
-      </div>
-    );
-  }
+  const handleOpenLinkedIn = useCallback(() => {
+    setState('waiting');
+    window.open('https://www.linkedin.com', '_blank', 'noopener,noreferrer');
+  }, []);
 
   if (state === 'connected') {
     const formattedDate = lastConnectedAt
@@ -235,7 +148,7 @@ export function LinkedInConnect({ onConnected, showTitle = true }: LinkedInConne
         )}
         <Alert className="border-green-200 bg-green-50 text-green-900 [&>svg]:text-green-600">
           <CheckCircle className="h-4 w-4" />
-          <AlertTitle>LinkedIn Account Connected ✅</AlertTitle>
+          <AlertTitle>LinkedIn Account Connected</AlertTitle>
           <AlertDescription>
             <p>POSTORA is authorized to post and engage on your behalf.</p>
             <p className="mt-1">Connected on {formattedDate}</p>
@@ -273,5 +186,62 @@ export function LinkedInConnect({ onConnected, showTitle = true }: LinkedInConne
     );
   }
 
-  return null;
+  // idle or waiting
+  return (
+    <div className="space-y-6">
+      {showTitle && (
+        <h3 className="text-lg font-semibold text-[#10153E]">Link Your LinkedIn Account</h3>
+      )}
+      <p className="text-sm text-[#6B7098]">
+        POSTORA connects to your existing LinkedIn session to schedule posts and automate engagement on your behalf. Secure, instant, and no password needed.
+      </p>
+
+      <div className="space-y-4">
+        <div className="rounded-xl border border-[#6B7098]/20 bg-[#F6F8FC] p-4">
+          <p className="text-xs font-medium text-[#6B7098] uppercase tracking-wide mb-2">Step 1</p>
+          <p className="text-sm text-[#10153E] mb-3">Drag this button to your browser bookmarks bar</p>
+          <a
+            href={bookmarkletHref}
+            draggable
+            onClick={(e) => {
+              e.preventDefault();
+              alert('Drag this button to your bookmarks bar, then click it while on LinkedIn.');
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#0A66C2] text-white rounded-lg cursor-grab active:cursor-grabbing select-none font-medium"
+          >
+            🔗 Connect POSTORA
+          </a>
+          <p className="text-xs text-[#6B7098] mt-2">👆 Drag this blue button to your bookmarks bar</p>
+          <p className="text-xs text-[#6B7098] mt-1">Only needs to be done once</p>
+        </div>
+
+        <div className="rounded-xl border border-[#6B7098]/20 bg-[#F6F8FC] p-4">
+          <p className="text-xs font-medium text-[#6B7098] uppercase tracking-wide mb-2">Step 2</p>
+          <p className="text-sm text-[#10153E] mb-3">Go to LinkedIn (make sure you&apos;re logged in) and click the bookmark</p>
+          <Button
+            variant="outline"
+            className="border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/10"
+            onClick={handleOpenLinkedIn}
+          >
+            <Linkedin className="w-4 h-4 mr-2" />
+            Open LinkedIn
+          </Button>
+        </div>
+
+        <div className="rounded-xl border border-[#6B7098]/20 bg-[#F6F8FC] p-4">
+          <p className="text-xs font-medium text-[#6B7098] uppercase tracking-wide mb-2">Step 3</p>
+          <p className="text-sm text-[#10153E]">Come back here — we&apos;ll detect the connection automatically</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-sm text-[#6B7098]">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0A66C2] opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0A66C2]" />
+        </span>
+        <span>Waiting for LinkedIn connection...</span>
+      </div>
+      <p className="text-xs text-[#6B7098]">Click the bookmark on LinkedIn, then come back here.</p>
+    </div>
+  );
 }

@@ -417,7 +417,7 @@ const Settings = () => {
                   <span className="w-full border-t border-[#6B7098]/20" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-[#6B7098]">Or use extension</span>
+                  <span className="bg-white px-2 text-[#6B7098]">Or use bookmarklet</span>
                 </div>
               </div>
 

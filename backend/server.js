@@ -574,6 +574,47 @@ async function apiAuthGuard(req, res, next) {
 app.use('/api', apiAuthGuard);
 app.use('/api/billing', billingRouter);
 
+// CORS for bookmarklet (runs on linkedin.com) — allow linkedin.com origin for save-cookies only
+const LINKEDIN_ORIGIN = 'https://www.linkedin.com';
+app.options('/api/linkedin/save-cookies', (req, res) => {
+  res.header('Access-Control-Allow-Origin', LINKEDIN_ORIGIN);
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.sendStatus(204);
+});
+app.post('/api/linkedin/save-cookies', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', LINKEDIN_ORIGIN);
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { li_at, jsessionid } = req.body || {};
+    if (!li_at) return res.status(400).json({ error: 'li_at is required' });
+
+    const { error } = await supabaseAdmin.from('linkedin_connections').upsert(
+      {
+        user_id: user.id,
+        li_at_cookie: li_at,
+        jsessionid: jsessionid || null,
+        access_token: 'cookie-auth',
+        is_active: true,
+        cookie_status: 'active',
+        last_connected_at: new Date().toISOString(),
+        last_tested_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    );
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'Server error' });
+  }
+});
+
 // GET /api/feature-flags — which dashboard pages are enabled and what message to show when disabled
 app.get('/api/feature-flags', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
