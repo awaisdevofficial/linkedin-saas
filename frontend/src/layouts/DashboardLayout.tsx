@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   LayoutDashboard,
   Calendar,
@@ -28,6 +29,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/auth-context';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/lib/supabase';
 import { FeatureFlagsProvider, useFeatureFlags } from '@/lib/feature-flags-context';
 import { FeatureDisabledPage } from '@/components/FeatureDisabledPage';
@@ -52,12 +54,31 @@ function pathToFlagKey(pathname: string): string | null {
 function DashboardLayoutInner() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, signOut } = useAuth();
+  const { subscription } = useSubscription();
   const { isEnabled, getMessage, isLoading: flagsLoading } = useFeatureFlags();
+  const trial_ends_at = subscription?.trial_ends_at ?? null;
+  const trial_expired = subscription?.trial_expired ?? true;
+  const daysLeft = trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  const welcomeTrialShown = useRef(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<'ok' | 'missing' | 'needsCookies' | 'expired'>('missing');
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null);
+
+  useEffect(() => {
+    if (welcomeTrialShown.current) return;
+    if (searchParams.get('welcome_trial') !== '1') return;
+    if (!subscription || subscription.trial_expired || !subscription.trial_ends_at) return;
+    welcomeTrialShown.current = true;
+    toast.success('Your 3-day free trial has started!');
+    const next = new URLSearchParams(searchParams);
+    next.delete('welcome_trial');
+    setSearchParams(next, { replace: true });
+  }, [subscription, searchParams, setSearchParams]);
 
   const flagKey = pathToFlagKey(location.pathname);
   const pageDisabled = flagKey != null && !flagsLoading && !isEnabled(flagKey);
@@ -201,6 +222,14 @@ function DashboardLayoutInner() {
       </Sheet>
 
       <div className="flex-1 flex flex-col min-h-0 lg:ml-64">
+        {!trial_expired && trial_ends_at && daysLeft <= 3 && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800 shrink-0">
+            ⏳ {daysLeft} day{daysLeft !== 1 ? 's' : ''} left on your free trial —{' '}
+            <Link to="/billing" className="font-semibold underline ml-1">
+              Upgrade to Pro
+            </Link>
+          </div>
+        )}
         <header className="bg-white border-b border-[#6B7098]/10 px-4 sm:px-6 py-4 shrink-0">
           <div className="flex items-center justify-between gap-4">
             <Sheet>

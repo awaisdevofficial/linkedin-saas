@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, ChevronRight, ChevronLeft, HelpCircle, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +36,9 @@ const dayMap: Record<string, string[]> = {
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const welcomeShown = useRef(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [showCookieHelp, setShowCookieHelp] = useState(false);
   const [showCookie, setShowCookie] = useState(false);
@@ -51,6 +54,16 @@ const Onboarding = () => {
     tone: '',
     frequency: '',
   });
+
+  useEffect(() => {
+    if (welcomeShown.current) return;
+    if (searchParams.get('welcome_trial') !== '1') return;
+    welcomeShown.current = true;
+    toast.success('Your 3-day free trial has started!');
+    const next = new URLSearchParams(searchParams);
+    next.delete('welcome_trial');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleNext = async () => {
     if (currentStep < 3) {

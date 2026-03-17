@@ -633,6 +633,17 @@ export async function getUsersWithAutoReplyEnabled() {
 
     if (subErr) return [];
 
+    const { data: profileRows } = await supabase
+      .from('profiles')
+      .select('id, trial_ends_at')
+      .in('id', candidateUserIds);
+
+    const trialActiveByUser = new Map();
+    (profileRows || []).forEach((row) => {
+      const active = row.trial_ends_at && new Date(row.trial_ends_at) > new Date();
+      trialActiveByUser.set(row.id, active);
+    });
+
     const latestSubByUser = new Map();
     (subsRows || [])
       .slice()
@@ -646,7 +657,9 @@ export async function getUsersWithAutoReplyEnabled() {
       const sub = latestSubByUser.get(userId);
       const plan = sub?.plan || 'free';
       const status = sub?.status || 'inactive';
-      const allowed = plan === 'pro' && (status === 'active' || status === 'trialing');
+      const hasProSub = plan === 'pro' && (status === 'active' || status === 'trialing');
+      const trialActive = trialActiveByUser.get(userId) === true;
+      const allowed = hasProSub || trialActive;
 
       if (!allowed) continue;
 

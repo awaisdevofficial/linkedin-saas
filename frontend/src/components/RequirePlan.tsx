@@ -13,7 +13,8 @@ export function RequirePro({ children }: Props) {
   if (loading) return <div className="flex justify-center mt-20 text-[#6B7098]">Loading...</div>;
 
   const allowed =
-    subscription?.plan === 'pro' && (subscription?.status === 'active' || subscription?.status === 'trialing');
+    (subscription?.plan === 'pro' && (subscription?.status === 'active' || subscription?.status === 'trialing')) ||
+    (!subscription?.trial_expired && !!subscription?.trial_ends_at);
 
   if (!allowed) return <Navigate to="/billing" replace />;
   return <>{children}</>;

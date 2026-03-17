@@ -73,7 +73,8 @@ const AuthCallback = () => {
           } catch {
             // On error (e.g. RLS), send to onboarding so user isn't stuck
           }
-          window.location.replace(hasCompletedOnboarding ? '/dashboard' : '/onboarding');
+          const welcomeParam = '?welcome_trial=1';
+          window.location.replace((hasCompletedOnboarding ? '/dashboard' : '/onboarding') + welcomeParam);
           return;
         } else {
           const params = new URLSearchParams(window.location.search);

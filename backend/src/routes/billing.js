@@ -78,15 +78,22 @@ router.get('/subscription', authenticate, async (req, res) => {
     if (error) throw error;
 
     const sub = subRows?.[0] ?? null;
-    return res.json(
-      sub
-        ? {
-            plan: sub.plan,
-            status: sub.status,
-            current_period_end: sub.current_period_end,
-          }
-        : { plan: 'free', status: 'inactive' }
-    );
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('trial_ends_at')
+      .eq('id', req.user.id)
+      .single();
+
+    const trial_ends_at = profile?.trial_ends_at ?? null;
+    const trial_expired = trial_ends_at ? new Date(trial_ends_at) < new Date() : true;
+
+    return res.json({
+      ...(sub || { plan: 'free', status: 'inactive' }),
+      ...(sub ? { current_period_end: sub.current_period_end } : {}),
+      trial_ends_at,
+      trial_expired,
+    });
   } catch (err) {
     console.error('[Polar] subscription error:', err);
     return res.status(500).json({ error: 'Failed to load subscription' });

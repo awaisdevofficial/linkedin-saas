@@ -9,6 +9,8 @@ export interface Subscription {
   plan: Plan;
   status: string;
   current_period_end?: string;
+  trial_ends_at?: string | null;
+  trial_expired?: boolean;
 }
 
 export function useSubscription() {

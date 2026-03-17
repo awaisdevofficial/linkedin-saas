@@ -1,7 +1,5 @@
 import { supabase } from '../services/supabase.js';
 
-const PLAN_RANK = { free: 0, pro: 1 };
-
 async function getLatestSubscriptionForUser(userId) {
   const { data, error } = await supabase
     .from('subscriptions')
@@ -15,6 +13,8 @@ async function getLatestSubscriptionForUser(userId) {
 }
 
 // Usage: router.post('/some-pro-endpoint', authenticate, requirePlan('pro'), handler);
+// Only allows access if: active/trialing Pro subscription OR profiles.trial_ends_at > NOW().
+// No free plan — everything else returns 403 upgrade_required.
 export const requirePlan = (minPlan) => async (req, res, next) => {
   if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -22,20 +22,37 @@ export const requirePlan = (minPlan) => async (req, res, next) => {
     const sub = await getLatestSubscriptionForUser(req.user.id);
     const plan = sub?.plan || 'free';
     const status = sub?.status || 'inactive';
+    const hasActiveSub = sub && (status === 'active' || status === 'trialing');
 
-    const isActive = status === 'active' || status === 'trialing' || plan === 'free';
-    const allowed = isActive && PLAN_RANK[plan] >= PLAN_RANK[minPlan];
+    if (hasActiveSub && plan === 'pro') {
+      req.subscription = sub;
+      return next();
+    }
 
-    if (!allowed) {
+    if (minPlan === 'pro') {
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('trial_ends_at')
+        .eq('id', req.user.id)
+        .single();
+      const trialActive = !profileErr && profile?.trial_ends_at && new Date(profile.trial_ends_at) > new Date();
+      if (trialActive) {
+        req.subscription = sub;
+        return next();
+      }
       return res.status(403).json({
         error: 'upgrade_required',
-        required: minPlan,
+        required: 'pro',
         current: plan,
+        trial_expired: true,
       });
     }
 
-    req.subscription = sub;
-    next();
+    return res.status(403).json({
+      error: 'upgrade_required',
+      required: minPlan,
+      current: plan,
+    });
   } catch (e) {
     return res.status(500).json({ error: 'Failed to validate subscription' });
   }

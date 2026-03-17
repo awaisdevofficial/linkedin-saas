@@ -1,43 +1,28 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Zap, Users, Mail } from 'lucide-react';
+import { Check, Users, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Navigation from '@/components/landing/Navigation';
 import Footer from '@/components/landing/Footer';
 
 const plans = [
   {
-    name: 'Free',
-    price: '$0',
-    period: '',
-    description: 'Get started with your LinkedIn content studio',
-    features: [
-      'Connect your LinkedIn account',
-      'Post scheduling and calendar',
-      'AI-generated post drafts',
-      'Engagement activity (likes, comments, replies)',
-      'Basic dashboard and analytics',
-    ],
-    cta: 'Get started free',
-    ctaVariant: 'outline' as const,
-    popular: true,
-    icon: Zap,
-  },
-  {
     name: 'Pro',
     price: '$49',
     period: '/month',
-    description: 'Extended access and support',
+    description: 'Start with a 3-day free trial, then $49/month. No card required to sign up.',
     features: [
-      'Everything in Free',
-      'Extended post generation',
+      'Unlimited AI post generation',
+      'LinkedIn auto-reply automation',
+      'Bulk post scheduling',
+      'RSS content sourcing',
       'Image/video caption tools (with your API key)',
-      'LinkedIn auto-reply automation (Pro)',
-      '3-day free trial + self-serve billing',
+      'Priority support',
     ],
-    cta: 'Start 3-day free trial',
-    ctaVariant: 'outline' as const,
-    popular: false,
+    cta: 'Start free trial',
+    ctaLink: '/auth/signup',
+    ctaVariant: 'default' as const,
+    popular: true,
     icon: Users,
   },
   {
@@ -51,6 +36,7 @@ const plans = [
       'Invoicing as agreed',
     ],
     cta: 'Contact us',
+    ctaLink: 'mailto:support@postora.io',
     ctaVariant: 'outline' as const,
     popular: false,
     icon: Mail,
@@ -79,14 +65,14 @@ const PricingPage = () => {
             Simple pricing for your LinkedIn studio
           </h1>
           <p className="text-lg text-[#6B7098] max-w-2xl mx-auto">
-            Start free. Upgrade to Pro for $49/month with a 3-day free trial—unlock auto-reply and more. Custom plans: contact us.
+            Try POSTORA free for 3 days. Then $49/month — cancel anytime.
           </p>
         </div>
       </section>
 
       <section className="relative z-10 pb-20 sm:pb-28 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
             {plans.map((plan) => (
               <div
                 key={plan.name}
@@ -130,32 +116,8 @@ const PricingPage = () => {
                   ))}
                 </ul>
 
-                {plan.name === 'Free' ? (
-                  <Link to="/auth/signup" className="block">
-                    <Button
-                      variant={plan.ctaVariant}
-                      size="lg"
-                      className={`w-full h-12 rounded-full text-base font-medium ${
-                        plan.popular
-                          ? 'bg-[#6366F1] hover:bg-[#4F46E5] text-white'
-                          : 'border-[#6B7098]/30 hover:bg-[#F6F8FC] text-[#10153E]'
-                      }`}
-                    >
-                      {plan.cta}
-                    </Button>
-                  </Link>
-                ) : plan.name === 'Pro' ? (
-                  <Link to="/billing" className="block">
-                    <Button
-                      variant={plan.ctaVariant}
-                      size="lg"
-                      className="w-full h-12 rounded-full text-base font-medium bg-[#6366F1] hover:bg-[#4F46E5] text-white border-0"
-                    >
-                      {plan.cta}
-                    </Button>
-                  </Link>
-                ) : (
-                  <a href="mailto:support@postora.io" className="block">
+                {plan.ctaLink.startsWith('http') || plan.ctaLink.startsWith('mailto:') ? (
+                  <a href={plan.ctaLink} className="block">
                     <Button
                       variant={plan.ctaVariant}
                       size="lg"
@@ -164,6 +126,18 @@ const PricingPage = () => {
                       {plan.cta}
                     </Button>
                   </a>
+                ) : (
+                  <Link to={plan.ctaLink} className="block">
+                    <Button
+                      variant={plan.ctaVariant}
+                      size="lg"
+                      className={`w-full h-12 rounded-full text-base font-medium ${
+                        plan.popular ? 'bg-[#6366F1] hover:bg-[#4F46E5] text-white border-0' : 'border-[#6B7098]/30 hover:bg-[#F6F8FC] text-[#10153E]'
+                      }`}
+                    >
+                      {plan.cta}
+                    </Button>
+                  </Link>
                 )}
               </div>
             ))}
