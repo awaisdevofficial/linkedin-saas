@@ -7,7 +7,6 @@ import {
   Trash2,
   Unlink,
   Shield,
-  CheckCircle,
   Key,
   Lock,
   Bell,
@@ -18,7 +17,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LinkedInConnect } from '@/components/linkedin/LinkedInConnect';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -69,10 +69,15 @@ const Settings = () => {
     email?: string;
     avatar_url?: string;
   } | null>(null);
-  const [isLinkedInConnected, setIsLinkedInConnected] = useState(false);
+  const [liAt, setLiAt] = useState('');
+  const [jsessionId, setJsessionId] = useState('');
+  const [linkedInStatus, setLinkedInStatus] = useState<'connected' | 'expired' | 'not_connected'>('not_connected');
+  const [lastConnectedAt, setLastConnectedAt] = useState<string | null>(null);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
-  const [linkedInConnectKey, setLinkedInConnectKey] = useState(0);
+  const [cookieHelpOpen, setCookieHelpOpen] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Sync tab from URL (e.g. /dashboard/settings?tab=notifications)
   useEffect(() => {
@@ -90,7 +95,7 @@ const Settings = () => {
         client.from('profiles').select('full_name, email, avatar_url').eq('id', user.id).maybeSingle(),
         client
           .from('linkedin_connections')
-          .select('li_at_cookie, jsessionid')
+          .select('li_at_cookie, jsessionid, is_active, cookie_status, last_connected_at')
           .eq('user_id', user.id)
           .maybeSingle(),
         client
@@ -100,8 +105,17 @@ const Settings = () => {
           .maybeSingle(),
       ]);
       setProfile(profileRes.data as typeof profile);
-      const conn = connRes.data as { li_at_cookie?: string; jsessionid?: string } | null;
-      setIsLinkedInConnected(!!(conn?.li_at_cookie || conn?.jsessionid));
+      const conn = connRes.data as { li_at_cookie?: string; jsessionid?: string; is_active?: boolean; cookie_status?: string; last_connected_at?: string } | null;
+      if (conn?.is_active && (conn.cookie_status || '').toLowerCase() === 'active') {
+        setLinkedInStatus('connected');
+        setLastConnectedAt(conn.last_connected_at || null);
+      } else if (conn && (conn.cookie_status || '').toLowerCase() === 'expired') {
+        setLinkedInStatus('expired');
+      } else {
+        setLinkedInStatus('not_connected');
+      }
+      setLiAt(conn?.li_at_cookie || '');
+      setJsessionId(conn?.jsessionid || '');
       const notif = notifRes.data as Partial<NotificationSettings> | null;
       if (notif) {
         setNotificationSettings({
@@ -196,16 +210,60 @@ const Settings = () => {
     }
   };
 
+  const handleSaveLinkedIn = async () => {
+    setSaveError(null);
+    setSaveSuccess(false);
+    const li = liAt.trim();
+    const js = jsessionId.trim();
+    if (!li || !js) {
+      setSaveError('Both li_at and JSESSIONID are required.');
+      return;
+    }
+    if (!supabase || !user) return;
+    setSaving('linkedin');
+    try {
+      const { error } = await supabase.from('linkedin_connections').upsert(
+        {
+          user_id: user.id,
+          li_at_cookie: li,
+          jsessionid: js,
+          access_token: 'cookie-auth',
+          is_active: true,
+          cookie_status: 'active',
+          last_connected_at: new Date().toISOString(),
+          last_tested_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+      if (error) {
+        setSaveError(error.message);
+        return;
+      }
+      setSaveSuccess(true);
+      setLinkedInStatus('connected');
+      setLastConnectedAt(new Date().toISOString());
+      window.dispatchEvent(new Event('linkedin-connection-updated'));
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const handleDisconnect = async () => {
     if (!supabase || !user) return;
     try {
       await supabase!
         .from('linkedin_connections')
-        .update({ is_active: false, li_at_cookie: null, jsessionid: null })
+        .update({ is_active: false, cookie_status: 'disconnected' })
         .eq('user_id', user.id);
-      setIsLinkedInConnected(false);
-      setLinkedInConnectKey((k) => k + 1);
+      setLinkedInStatus('not_connected');
+      setLastConnectedAt(null);
+      setLiAt('');
+      setJsessionId('');
       setDisconnectDialogOpen(false);
+      setSaveSuccess(false);
+      setSaveError(null);
       toast.success('LinkedIn disconnected');
       window.dispatchEvent(new Event('linkedin-connection-updated'));
     } catch (err) {
@@ -383,25 +441,8 @@ const Settings = () => {
         <TabsContent value="linkedin">
           <Card className="card-shadow border-none">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>LinkedIn Connection</CardTitle>
-                  <CardDescription>Manage your LinkedIn integration</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isLinkedInConnected ? (
-                    <span className="flex items-center gap-1 text-sm text-green-600">
-                      <CheckCircle className="w-4 h-4" />
-                      Connected
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-sm text-amber-600">
-                      <AlertTriangle className="w-4 h-4" />
-                      Not connected
-                    </span>
-                  )}
-                </div>
-              </div>
+              <CardTitle>LinkedIn Connection</CardTitle>
+              <CardDescription>Connect your LinkedIn account to enable automated posting and engagement</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <Button
@@ -417,21 +458,92 @@ const Settings = () => {
                   <span className="w-full border-t border-[#6B7098]/20" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-[#6B7098]">Or use bookmarklet</span>
+                  <span className="bg-white px-2 text-[#6B7098]">Or paste cookies</span>
                 </div>
               </div>
 
-              <LinkedInConnect key={linkedInConnectKey} showTitle={false} onConnected={() => setIsLinkedInConnected(true)} />
+              {/* Connection status */}
+              <div className="flex flex-wrap items-center gap-2">
+                {linkedInStatus === 'connected' && (
+                  <>
+                    <Badge className="bg-green-600 hover:bg-green-600">Connected</Badge>
+                    {lastConnectedAt && (
+                      <span className="text-sm text-[#6B7098]">
+                        Last connected: {new Date(lastConnectedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                      </span>
+                    )}
+                    <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => setDisconnectDialogOpen(true)}>
+                      <Unlink className="w-4 h-4 mr-1" />
+                      Disconnect
+                    </Button>
+                  </>
+                )}
+                {linkedInStatus === 'expired' && (
+                  <>
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">Session Expired</Badge>
+                    <span className="text-sm text-[#6B7098]">Please reconnect</span>
+                  </>
+                )}
+                {linkedInStatus === 'not_connected' && (
+                  <Badge variant="secondary" className="bg-[#6B7098]/10 text-[#6B7098]">Not Connected</Badge>
+                )}
+              </div>
 
-              {isLinkedInConnected && (
+              <Collapsible open={cookieHelpOpen} onOpenChange={setCookieHelpOpen}>
+                <CollapsibleTrigger className="text-sm font-medium text-[#2D5AF6] hover:underline flex items-center gap-1">
+                  How to get your LinkedIn cookies →
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <ol className="mt-3 text-sm text-[#6B7098] list-decimal list-inside space-y-1 pl-1">
+                    <li>Open LinkedIn in your browser and make sure you&apos;re logged in</li>
+                    <li>Press F12 to open Developer Tools</li>
+                    <li>Go to the Application tab (Chrome) or Storage tab (Firefox)</li>
+                    <li>Click Cookies → https://www.linkedin.com</li>
+                    <li>Find li_at → copy the value</li>
+                    <li>Find JSESSIONID → copy the value (remove the quotes)</li>
+                    <li>Paste both values below and click Save</li>
+                  </ol>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="li_at">li_at Cookie</Label>
+                  <Input
+                    id="li_at"
+                    type="text"
+                    placeholder="Paste your li_at value here"
+                    value={liAt}
+                    onChange={(e) => setLiAt(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jsessionid">JSESSIONID Cookie</Label>
+                  <Input
+                    id="jsessionid"
+                    type="text"
+                    placeholder="Paste your JSESSIONID value here"
+                    value={jsessionId}
+                    onChange={(e) => setJsessionId(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                </div>
                 <Button
-                  variant="outline"
-                  className="w-full text-red-600 border-red-200 hover:bg-red-50"
-                  onClick={() => setDisconnectDialogOpen(true)}
+                  className="w-full bg-[#2D5AF6] hover:bg-[#1E4AD6]"
+                  onClick={handleSaveLinkedIn}
+                  disabled={!!saving}
                 >
-                  <Unlink className="w-4 h-4 mr-2" />
-                  Disconnect
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Connection
                 </Button>
+              </div>
+
+              {saveSuccess && (
+                <p className="text-sm text-green-600">LinkedIn connected successfully ✅</p>
+              )}
+              {saveError && (
+                <p className="text-sm text-red-600">{saveError}</p>
               )}
             </CardContent>
           </Card>

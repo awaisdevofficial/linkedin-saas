@@ -10,6 +10,9 @@ node_modules
 dist
 frontend/dist
 
+# Legacy (removed)
+postora-extension
+
 # Editor / OS
 .DS_Store
 *.log
