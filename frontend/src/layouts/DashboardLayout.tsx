@@ -12,6 +12,8 @@ import {
   ChevronDown,
   FileText,
   Settings,
+  Crown,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +38,8 @@ const navItems: { icon: typeof LayoutDashboard; label: string; href: string; too
   { icon: Calendar, label: 'Posts', href: '/dashboard/posts/activity', tooltip: 'Manage and schedule posts', flagKey: 'posts_activity' },
   { icon: MessageSquare, label: 'Comments', href: '/dashboard/comments/activity', tooltip: 'View and reply to comments', flagKey: 'comments_activity' },
   { icon: Zap, label: 'Activity', href: '/dashboard/automation', tooltip: 'Engagement and schedule settings', flagKey: 'automation' },
-  { icon: FileText, label: 'Invoices', href: '/dashboard/invoices', tooltip: 'Your invoices and billing' },
+  { icon: FileText, label: 'Invoices', href: '/dashboard/invoices', tooltip: 'Your invoices' },
+  { icon: Crown, label: 'Billing', href: '/billing', tooltip: 'Upgrade to Pro or manage subscription' },
 ];
 
 function pathToFlagKey(pathname: string): string | null {
@@ -285,6 +288,15 @@ function DashboardLayoutInner() {
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
                     <Link to="/dashboard/settings">Settings</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/billing" className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4" />
+                      Billing
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/pricing">Pricing</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600">

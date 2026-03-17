@@ -79,7 +79,7 @@ const PricingPage = () => {
             Simple pricing for your LinkedIn studio
           </h1>
           <p className="text-lg text-[#6B7098] max-w-2xl mx-auto">
-            Start free. Paid plans and custom options are managed by us—contact support for details.
+            Start free. Upgrade to Pro for $49/month with a 3-day free trial—unlock auto-reply and more. Custom plans: contact us.
           </p>
         </div>
       </section>
@@ -149,7 +149,7 @@ const PricingPage = () => {
                     <Button
                       variant={plan.ctaVariant}
                       size="lg"
-                      className="w-full h-12 rounded-full text-base font-medium border-[#6B7098]/30 hover:bg-[#F6F8FC] text-[#10153E]"
+                      className="w-full h-12 rounded-full text-base font-medium bg-[#6366F1] hover:bg-[#4F46E5] text-white border-0"
                     >
                       {plan.cta}
                     </Button>
@@ -170,7 +170,7 @@ const PricingPage = () => {
           </div>
 
           <p className="text-center text-sm text-[#6B7098] mt-10 max-w-xl mx-auto">
-            Plans and features are as offered in the product. We do not charge automatically; paid access and invoices are as agreed. See our <Link to="/terms-and-conditions" className="text-[#6366F1] hover:underline">Terms of Service</Link>, <Link to="/privacy-policy" className="text-[#6366F1] hover:underline">Privacy Policy</Link> and <Link to="/refund-policy" className="text-[#6366F1] hover:underline">Refund Policy</Link>.
+            Pro is billed securely via Polar. Cancel anytime. See our <Link to="/terms-and-conditions" className="text-[#6366F1] hover:underline">Terms of Service</Link>, <Link to="/privacy-policy" className="text-[#6366F1] hover:underline">Privacy Policy</Link> and <Link to="/refund-policy" className="text-[#6366F1] hover:underline">Refund Policy</Link>.
           </p>
           <p className="text-center text-sm text-[#6B7098] mt-3 max-w-xl mx-auto">
             By signing up you agree to our <Link to="/terms-and-conditions" className="text-[#6366F1] hover:underline">Terms of Service</Link> and <Link to="/privacy-policy" className="text-[#6366F1] hover:underline">Privacy Policy</Link>. Please read and accept them on the signup page.

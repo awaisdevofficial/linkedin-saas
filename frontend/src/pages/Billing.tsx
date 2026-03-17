@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Crown, Check, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -126,6 +127,11 @@ export default function BillingPage() {
 
         <p className="text-center text-xs text-[#6B7098] mt-6">
           No charge for 3 days · Cancel anytime · Secured by Polar.sh
+        </p>
+        <p className="text-center mt-4">
+          <Link to="/pricing" className="text-sm text-[#6366F1] hover:underline">
+            View all plans
+          </Link>
         </p>
       </div>
     </div>
