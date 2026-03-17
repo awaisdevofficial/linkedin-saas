@@ -17,16 +17,8 @@ import CommentsActivity from './pages/dashboard/CommentsActivity';
 import AutomationSettings from './pages/dashboard/AutomationSettings';
 import Settings from './pages/dashboard/Settings';
 import Invoices from './pages/dashboard/Invoices';
-import PendingPage from './pages/Pending';
 import BannedPage from './pages/Banned';
 import ExpiredPage from './pages/Expired';
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminInvoices from './pages/admin/AdminInvoices';
-import AdminLogs from './pages/admin/AdminLogs';
-import AdminFeatureFlags from './pages/admin/AdminFeatureFlags';
 import PricingPage from './pages/PricingPage';
 import BillingPage from './pages/Billing';
 import BillingSuccess from './pages/BillingSuccess';
@@ -117,18 +109,8 @@ function App() {
               <Route path="settings" element={<Settings />} />
             </Route>
 
-            <Route path="/pending" element={<PendingPage />} />
             <Route path="/banned" element={<BannedPage />} />
             <Route path="/expired" element={<ExpiredPage />} />
-
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="invoices" element={<AdminInvoices />} />
-              <Route path="pages" element={<AdminFeatureFlags />} />
-              <Route path="logs" element={<AdminLogs />} />
-            </Route>
 
             {/* Redirect old / typo URLs to canonical routes */}
             <Route path="/Pricing" element={<Navigate to="/pricing" replace />} />

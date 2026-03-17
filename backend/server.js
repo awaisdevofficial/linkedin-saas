@@ -7,7 +7,6 @@ import cookieParser from 'cookie-parser';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
-import adminRoutes from './src/routes/admin.routes.js';
 import webhooksRouter from './src/routes/webhooks.js';
 import billingRouter from './src/routes/billing.js';
 import { logger } from './src/utils/logger.js';
@@ -544,12 +543,6 @@ async function apiAuthGuard(req, res, next) {
       .eq('id', user.id)
       .single();
     const status = profile?.status ?? 'approved';
-    if (status === 'pending') {
-      return res.status(403).json({
-        error: 'PENDING_APPROVAL',
-        message: 'Your account is pending admin approval.',
-      });
-    }
     if (status === 'banned') {
       return res.status(403).json({
         error: 'BANNED',
@@ -1199,8 +1192,6 @@ app.post('/api/automation/trigger-reply-comments', async (req, res) => {
     return res.status(500).json({ error: e?.message || 'Webhook request failed' });
   }
 });
-
-app.use('/admin', adminRoutes);
 
 app.listen(PORT, () => {
   logger.info('server_started', { port: PORT, backendUrl: BACKEND_URL });
