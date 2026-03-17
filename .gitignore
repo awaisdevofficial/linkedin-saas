@@ -1,0 +1,18 @@
+# Dependencies
+node_modules
+
+# Environment (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist
+frontend/dist
+
+# Editor / OS
+.DS_Store
+*.log
+*.tsbuildinfo
+
+# Optional: keep backend and frontend .gitignore rules in sync with this file

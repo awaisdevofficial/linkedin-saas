@@ -1,0 +1,164 @@
+import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Mail, Twitter } from 'lucide-react';
+import { PostoraLogo } from '@/components/PostoraLogo';
+
+gsap.registerPlugin(ScrollTrigger);
+
+const footerLinks = {
+  product: {
+    title: 'Product',
+    links: [
+      { label: 'Features', href: '#features' },
+      { label: 'Integrations', href: '#' },
+      { label: 'Changelog', href: '#' },
+    ],
+  },
+  company: {
+    title: 'Company',
+    links: [
+      { label: 'About', href: '#' },
+      { label: 'Blog', href: '#' },
+      { label: 'Careers', href: '#' },
+      { label: 'Contact', href: '#' },
+    ],
+  },
+  connect: {
+    title: 'Connect',
+    links: [
+      { label: 'support@postora.io', href: 'mailto:support@postora.io', icon: Mail },
+      { label: '@postora', href: '#', icon: Twitter },
+      { label: 'Status', href: '#' },
+    ],
+  },
+};
+
+const Footer = () => {
+  const footerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const footer = footerRef.current;
+    if (!footer) return;
+
+    const ctx = gsap.context(() => {
+      const columns = footer.querySelectorAll('.footer-column');
+      columns.forEach((col, i) => {
+        gsap.fromTo(col,
+          { y: 18, opacity: 0 },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.5,
+            delay: i * 0.1,
+            scrollTrigger: {
+              trigger: col,
+              start: 'top 95%',
+              toggleActions: 'play none none reverse',
+            }
+          }
+        );
+      });
+    }, footer);
+
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <footer
+      ref={footerRef}
+      className="relative w-full bg-white py-12 sm:py-16 z-[70]"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Main Footer */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-10 sm:mb-12">
+          {/* Logo Column */}
+          <div className="footer-column col-span-2 md:col-span-1">
+            <Link to="/" className="flex items-center gap-2 mb-4">
+              <PostoraLogo variant="horizontal" showTagline={false} size="sm" />
+            </Link>
+            <p className="text-sm text-[#6B7098]">
+              Your LinkedIn content studio, on autopilot.
+            </p>
+          </div>
+
+          {/* Product */}
+          <div className="footer-column">
+            <h4 className="font-semibold text-[#10153E] mb-3 sm:mb-4 text-sm sm:text-base">{footerLinks.product.title}</h4>
+            <ul className="space-y-1.5 sm:space-y-2">
+              {footerLinks.product.links.map((link, i) => (
+                <li key={i}>
+                  <a
+                    href={link.href}
+                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 block min-h-[44px] flex items-center touch-manipulation"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Company */}
+          <div className="footer-column">
+            <h4 className="font-semibold text-[#10153E] mb-3 sm:mb-4 text-sm sm:text-base">{footerLinks.company.title}</h4>
+            <ul className="space-y-1.5 sm:space-y-2">
+              {footerLinks.company.links.map((link, i) => (
+                <li key={i}>
+                  <a
+                    href={link.href}
+                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 block min-h-[44px] flex items-center touch-manipulation"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Connect */}
+          <div className="footer-column">
+            <h4 className="font-semibold text-[#10153E] mb-3 sm:mb-4 text-sm sm:text-base">{footerLinks.connect.title}</h4>
+            <ul className="space-y-1.5 sm:space-y-2">
+              {footerLinks.connect.links.map((link, i) => (
+                <li key={i}>
+                  <a
+                    href={link.href}
+                    className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors inline-flex items-center gap-2 py-2 min-h-[44px] items-center touch-manipulation"
+                  >
+                    {link.icon && <link.icon className="w-4 h-4 shrink-0" />}
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="pt-6 sm:pt-8 border-t border-[#6B7098]/15 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-[#6B7098] text-center sm:text-left">
+            © {new Date().getFullYear()} Postora. All rights reserved.
+          </p>
+          <div className="flex items-center gap-4 sm:gap-6 flex-wrap justify-center sm:justify-end">
+            <Link to="/pricing" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 px-1 min-h-[44px] flex items-center touch-manipulation">
+              Pricing
+            </Link>
+            <Link to="/terms-and-conditions" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 px-1 min-h-[44px] flex items-center touch-manipulation">
+              Terms
+            </Link>
+            <Link to="/privacy-policy" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 px-1 min-h-[44px] flex items-center touch-manipulation">
+              Privacy
+            </Link>
+            <Link to="/refund-policy" className="text-sm text-[#6B7098] hover:text-[#10153E] transition-colors py-2 px-1 min-h-[44px] flex items-center touch-manipulation">
+              Refund policy
+            </Link>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
+export default Footer;

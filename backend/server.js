@@ -21,6 +21,10 @@ const stateStore = new Map();
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 const BACKEND_URL = (process.env.BACKEND_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 
+// External provider base URLs (override via env if needed)
+const LINKEDIN_BASE_URL = process.env.LINKEDIN_BASE_URL || 'https://www.linkedin.com';
+const LINKEDIN_API_BASE_URL = process.env.LINKEDIN_API_BASE_URL || 'https://api.linkedin.com';
+
 const ALLOWED_ORIGINS = [FRONTEND_URL];
 if (process.env.CORS_EXTRA_ORIGINS) {
   ALLOWED_ORIGINS.push(...process.env.CORS_EXTRA_ORIGINS.split(',').map((o) => o.trim()));
@@ -142,7 +146,7 @@ app.get('/auth/linkedin', (req, res) => {
     state,
     scope: SCOPES,
   });
-  res.redirect(`https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`);
+  res.redirect(`${LINKEDIN_BASE_URL}/oauth/v2/authorization?${params.toString()}`);
 });
 
 // ——— Step 2: LinkedIn redirects back with code ———
@@ -170,7 +174,7 @@ app.get('/auth/linkedin/callback', async (req, res) => {
 
   try {
     // Exchange code for access token
-    const tokenRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+    const tokenRes = await fetch(`${LINKEDIN_BASE_URL}/oauth/v2/accessToken`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -192,7 +196,7 @@ app.get('/auth/linkedin/callback', async (req, res) => {
     const refreshToken = tokenData.refresh_token || null;
 
     // Get profile (OpenID Connect userinfo)
-    const profileRes = await fetch('https://api.linkedin.com/v2/userinfo', {
+    const profileRes = await fetch(`${LINKEDIN_API_BASE_URL}/v2/userinfo`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
@@ -328,75 +332,87 @@ app.get('/auth/linkedin/callback', async (req, res) => {
 // Body: { email, password, redirect?, redirect_url? }. Returns { redirectUrl } magic link or 401.
 // For mobile: pass redirect_url (e.g. postora://auth/callback) to receive magic link redirect in app.
 app.post('/auth/login-email', async (req, res) => {
-  const { email, password, redirect, redirect_url } = req.body || {};
-  if (!email || !password || !supabaseAdmin) {
-    return res.status(400).json({ error: 'Missing email or password' });
-  }
-  const emailNorm = String(email).trim().toLowerCase();
-  if (!emailNorm) return res.status(400).json({ error: 'Invalid email' });
+  try {
+    const { email, password, redirect, redirect_url } = req.body || {};
+    if (!email || !password || !supabaseAdmin) {
+      return res.status(400).json({ error: 'Missing email or password' });
+    }
+    const emailNorm = String(email).trim().toLowerCase();
+    if (!emailNorm) return res.status(400).json({ error: 'Invalid email' });
 
-  const { data: profilesList } = await supabaseAdmin.from('profiles').select('id, email').limit(5000);
-  const profile = (profilesList || []).find(
-    (p) => p.email && String(p.email).trim().toLowerCase() === emailNorm
-  );
+    // Query by email (eq + ilike fallback for case-insensitive)
+    let profile = null;
+    let profileError = null;
+    const { data: byEq } = await supabaseAdmin.from('profiles').select('id, email').eq('email', emailNorm).limit(1).maybeSingle();
+    if (byEq?.id) {
+      profile = byEq;
+    } else {
+      const { data: byIlike, error: e } = await supabaseAdmin.from('profiles').select('id, email').ilike('email', emailNorm).limit(1).maybeSingle();
+      profileError = e;
+      profile = byIlike;
+    }
 
-  if (!profile?.id) {
-    return res.status(401).json({ error: 'No account found with this email. Sign up or use LinkedIn.' });
-  }
+    if (profileError || !profile?.id) {
+      return res.status(401).json({ error: 'No account found with this email. Sign up or use LinkedIn.' });
+    }
 
-  const { data: pwRow } = await supabaseAdmin
-    .from('user_passwords')
-    .select('password_hash')
-    .eq('user_id', profile.id)
-    .single();
+    const { data: pwRow } = await supabaseAdmin
+      .from('user_passwords')
+      .select('password_hash')
+      .eq('user_id', profile.id)
+      .single();
 
-  if (!pwRow?.password_hash) {
-    return res.status(401).json({
-      error: 'No password set for this account. Sign in with LinkedIn first, then go to Create password (or Settings) to set one.',
-    });
-  }
+    if (!pwRow?.password_hash) {
+      return res.status(401).json({
+        error: 'No password set for this account. Sign in with LinkedIn first, then go to Create password (or Settings) to set one.',
+      });
+    }
 
-  const ok = await bcrypt.compare(password, pwRow.password_hash);
-  if (!ok) {
-    return res.status(401).json({ error: 'Incorrect password.' });
-  }
+    const ok = await bcrypt.compare(password, pwRow.password_hash);
+    if (!ok) {
+      return res.status(401).json({ error: 'Incorrect password.' });
+    }
 
-  const userEmail = profile.email || emailNorm;
+    const userEmail = profile.email || emailNorm;
 
-  // Mobile: return tokens directly, no redirect (postora://auth/callback)
-  if (redirect_url === 'postora://auth/callback' && supabaseAdmin) {
-    const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+    // Mobile: return tokens directly, no redirect (postora://auth/callback)
+    if (redirect_url === 'postora://auth/callback' && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+        email: userEmail,
+        password,
+      });
+      if (error) return res.status(401).json({ error: error.message });
+      return res.json({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    }
+
+    // Web: normal flow (redirect via magic link)
+    const hasCustomRedirect = redirect_url && typeof redirect_url === 'string' && /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(redirect_url.trim());
+    const redirectTo = hasCustomRedirect
+      ? String(redirect_url).trim()
+      : (() => {
+          const redirectPath = redirect && /^\/[a-zA-Z0-9/_-]*$/.test(String(redirect)) ? String(redirect) : '/dashboard';
+          return `${FRONTEND_URL}${redirectPath}`.replace(/\/$/, '') || `${FRONTEND_URL}/dashboard`;
+        })();
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
       email: userEmail,
-      password,
+      options: { redirectTo },
     });
-    if (error) return res.status(401).json({ error: error.message });
-    return res.json({
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-    });
-  }
 
-  // Web: normal flow (redirect via magic link)
-  const hasCustomRedirect = redirect_url && typeof redirect_url === 'string' && /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(redirect_url.trim());
-  const redirectTo = hasCustomRedirect
-    ? String(redirect_url).trim()
-    : (() => {
-        const redirectPath = redirect && /^\/[a-zA-Z0-9/_-]*$/.test(String(redirect)) ? String(redirect) : '/dashboard';
-        return `${FRONTEND_URL}${redirectPath}`.replace(/\/$/, '') || `${FRONTEND_URL}/dashboard`;
-      })();
-  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: userEmail,
-    options: { redirectTo },
-  });
+    if (linkError || !linkData?.properties?.action_link) {
+      logger.auth('email_login_magic_link_error', { error: linkError?.message });
+      return res.status(500).json({ error: 'Login failed. Try again.' });
+    }
 
-  if (linkError || !linkData?.properties?.action_link) {
-    logger.auth('email_login_magic_link_error', { error: linkError?.message });
+    logger.auth('email_login_success', { userId: profile.id });
+    return res.json({ redirectUrl: linkData.properties.action_link });
+  } catch (err) {
+    logger.auth('email_login_error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Login failed. Try again.' });
   }
-
-  logger.auth('email_login_success', { userId: profile.id });
-  res.json({ redirectUrl: linkData.properties.action_link });
 });
 
 // GET /api/auth/has-password — check if user has a password set (for redirecting new LinkedIn users to set-password)
@@ -412,6 +428,14 @@ app.get('/api/auth/has-password', async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
+
+// Sync plain password to Supabase Auth so mobile signInWithPassword works (same user as user_passwords).
+function syncPasswordToSupabaseAuth(userId, plainPassword) {
+  if (!supabaseAdmin || !plainPassword) return;
+  supabaseAdmin.auth.admin.updateUserById(userId, { password: plainPassword }).then(({ error }) => {
+    if (error) logger.auth('sync_password_to_auth_error', { userId, error: error.message });
+  }).catch((e) => logger.auth('sync_password_to_auth_error', { userId, error: e.message }));
+}
 
 // POST /api/auth/set-password — new user (e.g. after LinkedIn signup) sets password for email login
 app.post('/api/auth/set-password', async (req, res) => {
@@ -430,6 +454,7 @@ app.post('/api/auth/set-password', async (req, res) => {
       { onConflict: 'user_id' }
     );
     if (error) return res.status(500).json({ error: 'Failed to save password' });
+    syncPasswordToSupabaseAuth(user.id, password);
     logger.auth('set_password_success', { userId: user.id });
     return res.json({ success: true });
   } catch (e) {
@@ -458,6 +483,7 @@ app.post('/api/auth/change-password', async (req, res) => {
       { onConflict: 'user_id' }
     );
     if (error) return res.status(500).json({ error: 'Failed to update password' });
+    syncPasswordToSupabaseAuth(user.id, newPassword);
     logger.auth('change_password_success', { userId: user.id });
     return res.json({ success: true });
   } catch (e) {
@@ -482,6 +508,7 @@ app.post('/api/auth/update-password', async (req, res) => {
       { onConflict: 'user_id' }
     );
     if (error) return res.status(500).json({ error: 'Failed to save password' });
+    syncPasswordToSupabaseAuth(user.id, newPassword);
     logger.auth('update_password_success', { userId: user.id });
     return res.json({ success: true });
   } catch (e) {
@@ -1057,12 +1084,18 @@ app.post('/api/publish-now', async (req, res) => {
 });
 
 // POST /api/automation/trigger-like-comment — proxy to n8n (avoids CORS/SSL "Failed to fetch" from browser)
-const LIKE_COMMENT_WEBHOOK = process.env.N8N_LIKE_COMMENT_WEBHOOK_URL || 'https://auto.nsolbpo.com/webhook/Like&Comment';
-const REPLY_WEBHOOK = process.env.N8N_REPLY_WEBHOOK_URL || 'https://auto.nsolbpo.com/webhook/reply-to-comments';
+const LIKE_COMMENT_WEBHOOK = process.env.N8N_LIKE_COMMENT_WEBHOOK_URL;
+const REPLY_WEBHOOK = process.env.N8N_REPLY_WEBHOOK_URL;
 
 app.post('/api/automation/trigger-like-comment', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  if (!LIKE_COMMENT_WEBHOOK) {
+    logger.api('trigger_like_comment_missing_url', {
+      error: 'N8N_LIKE_COMMENT_WEBHOOK_URL not set in environment',
+    });
+    return res.status(503).json({ error: 'Automation webhook URL not configured' });
+  }
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
@@ -1099,6 +1132,12 @@ app.post('/api/automation/trigger-like-comment', async (req, res) => {
 app.post('/api/automation/trigger-reply-comments', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token || !supabaseAdmin) return res.status(401).json({ error: 'Unauthorized' });
+  if (!REPLY_WEBHOOK) {
+    logger.api('trigger_reply_comments_missing_url', {
+      error: 'N8N_REPLY_WEBHOOK_URL not set in environment',
+    });
+    return res.status(503).json({ error: 'Automation webhook URL not configured' });
+  }
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });

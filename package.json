@@ -1,0 +1,18 @@
+{
+  "name": "linkeidn-saas",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Postora — LinkedIn SaaS (frontend + OAuth backend)",
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "start:backend": "npm run start --prefix backend",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "automation": "npm run automation --prefix backend",
+    "dev:automation": "npm run dev:automation --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
