@@ -40,14 +40,14 @@ const navItems: { icon: typeof LayoutDashboard; label: string; href: string; too
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', tooltip: 'Overview and quick stats' },
   { icon: Calendar, label: 'Posts', href: '/dashboard/posts/activity', tooltip: 'Manage and schedule posts', flagKey: 'posts_activity' },
   { icon: MessageSquare, label: 'Comments', href: '/dashboard/comments/activity', tooltip: 'View and reply to comments', flagKey: 'comments_activity' },
-  { icon: Zap, label: 'Activity', href: '/dashboard/automation', tooltip: 'Engagement and schedule settings', flagKey: 'automation' },
+  { icon: Zap, label: 'Activity', href: '/dashboard/activity', tooltip: 'Engagement and schedule settings', flagKey: 'automation' },
   { icon: Crown, label: 'Billing', href: '/dashboard/billing', tooltip: 'Upgrade to Pro or manage subscription' },
 ];
 
 function pathToFlagKey(pathname: string): string | null {
   if (pathname === '/dashboard/posts/activity') return 'posts_activity';
   if (pathname === '/dashboard/comments/activity') return 'comments_activity';
-  if (pathname === '/dashboard/automation') return 'automation';
+  if (pathname === '/dashboard/activity') return 'automation';
   return null;
 }
 

@@ -9,6 +9,8 @@ import {
   Bell,
   Eye,
   EyeOff,
+  HelpCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -16,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
@@ -463,10 +466,19 @@ const Settings = () => {
                 </div>
               )}
             </div>
-            <p className="text-sm text-[#6B7098] mb-2">
-              How to get cookies: F12 → Application (Chrome) or Storage (Firefox) → Cookies → linkedin.com → copy li_at and JSESSIONID.
-            </p>
-            <p className="text-xs text-[#6B7098] mb-3">Paste below. Stored securely; disconnect anytime.</p>
+            <p className="text-sm text-[#6B7098] mb-2">Paste li_at and JSESSIONID below.</p>
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-[#6366F1] hover:underline mb-3">
+                <HelpCircle className="w-3.5 h-3.5" />
+                How to get cookies
+                <ChevronDown className="w-3.5 h-3.5" />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <p className="text-xs text-[#6B7098] mb-3">
+                  F12 → Application (Chrome) or Storage (Firefox) → Cookies → linkedin.com → copy li_at and JSESSIONID. Stored securely; disconnect anytime.
+                </p>
+              </CollapsibleContent>
+            </Collapsible>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
               <div className="space-y-2">
                 <Label htmlFor="li_at" className="text-[#10153E] font-medium text-sm">li_at</Label>

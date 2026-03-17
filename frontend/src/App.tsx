@@ -95,7 +95,7 @@ function App() {
               <Route index element={<DashboardHome />} />
               <Route path="posts/activity" element={<PostsActivity />} />
               <Route path="comments/activity" element={<CommentsActivity />} />
-              <Route path="automation" element={<AutomationSettings />} />
+              <Route path="activity" element={<AutomationSettings />} />
               <Route path="billing" element={<Billing />} />
               <Route path="settings" element={<Settings />} />
             </Route>
@@ -116,6 +116,7 @@ function App() {
             <Route path="/refund" element={<Navigate to="/refund-policy" replace />} />
             <Route path="/refund&policy" element={<Navigate to="/refund-policy" replace />} />
             <Route path="/billing" element={<Navigate to="/dashboard/billing" replace />} />
+            <Route path="/dashboard/automation" element={<Navigate to="/dashboard/activity" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
 

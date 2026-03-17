@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Save, MessageSquare, Reply, Zap, Sparkles } from 'lucide-react';
+import { Save, MessageSquare, Reply, Zap, Sparkles, HelpCircle, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth-context';
@@ -207,51 +208,35 @@ const AutomationSettings = () => {
   const postTone = contentSettings?.post_tone || 'professional';
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-[#0f172a]">Activity Settings</h1>
-        <p className="mt-1 text-[15px] text-[#64748b]">
-          Configure how POSTORA handles your LinkedIn content, scheduling, and engagement so it matches your voice.
+    <div className="min-h-0 space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#10153E]">Activity</h1>
+        <p className="mt-1 text-sm text-[#6B7098]">
+          Post generation, engagement, and reply settings.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full grid grid-cols-3 h-12 p-1 bg-[#f1f5f9] rounded-xl border border-[#e2e8f0] mb-6">
-          <TabsTrigger
-            value="post"
-            className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#0f172a]"
-          >
-            <Zap className="w-4 h-4 mr-2 inline" />
-            Post Generation
+        <TabsList className="bg-[#F6F8FC] border border-[#6B7098]/10 w-full sm:w-auto grid grid-cols-3 h-11">
+          <TabsTrigger value="post" className="data-[state=active]:bg-white data-[state=active]:text-[#10153E]">
+            <Zap className="w-4 h-4 mr-2" />
+            Post
           </TabsTrigger>
-          <TabsTrigger
-            value="engage"
-            className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#0f172a]"
-          >
-            <MessageSquare className="w-4 h-4 mr-2 inline" />
-            Engage Others
+          <TabsTrigger value="engage" className="data-[state=active]:bg-white data-[state=active]:text-[#10153E]">
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Engage
           </TabsTrigger>
-          <TabsTrigger
-            value="reply"
-            className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#0f172a]"
-          >
-            <Reply className="w-4 h-4 mr-2 inline" />
-            Reply to Comments
+          <TabsTrigger value="reply" className="data-[state=active]:bg-white data-[state=active]:text-[#10153E]">
+            <Reply className="w-4 h-4 mr-2" />
+            Reply
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="post" className="mt-0 focus-visible:outline-none">
-          <Card className="border border-[#e2e8f0] shadow-sm rounded-2xl overflow-hidden bg-white">
+        <TabsContent value="post" className="mt-6 focus-visible:outline-none">
+          <Card className="border border-[#6B7098]/10 rounded-lg overflow-hidden bg-white shadow-sm">
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
-                  <Zap className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-[#0f172a]">Post Generation</CardTitle>
-                  <CardDescription className="text-[#64748b] mt-0.5">Configure how new posts are generated and published</CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-lg font-semibold text-[#10153E]">Post generation</CardTitle>
+              <CardDescription className="text-[#6B7098] text-sm">How new posts are generated and published</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-0">
               {/* Generation Mode */}
@@ -343,14 +328,12 @@ const AutomationSettings = () => {
               </div>
               <Separator className="bg-[#e2e8f0]" />
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-[#334155]">KIE API key (image & video generation)</Label>
-                <p className="text-xs text-[#64748b]">
-                  Your key is stored securely and used only for generating post images and videos (text-to-image, text-to-video). Get one at{' '}
-                  <a href="https://kie.ai/api-key" target="_blank" rel="noopener noreferrer" className="text-[#6366F1] hover:underline">
-                    kie.ai/api-key
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium text-[#334155]">KIE API key</Label>
+                  <a href="https://kie.ai/api-key" target="_blank" rel="noopener noreferrer" className="text-xs text-[#6366F1] hover:underline">
+                    Get key
                   </a>
-                  .
-                </p>
+                </div>
                 <Input
                   type="password"
                   autoComplete="off"
@@ -359,19 +342,23 @@ const AutomationSettings = () => {
                   placeholder="Paste your KIE API key"
                   className="rounded-lg border-[#e2e8f0] bg-white focus-visible:ring-[#6366F1] font-mono text-sm"
                 />
-              </div>
-              <div className="rounded-xl bg-[#eff6ff] border border-[#bfdbfe] p-3 text-sm text-[#1e40af]">
-                When a post has a generated video, the video will be posted to LinkedIn when you publish (manually or via schedule).
-              </div>
-              <div className="rounded-xl bg-[#f0fdf4] border border-[#bbf7d0] p-3 text-sm text-[#166534]">
-                The image is generated from the post content; the video is also generated from the post content. When these tools run, whatever you provide below (post content or your custom captions) will be used for generation.
+                {kieKeyPaid === false && (
+                  <p className="text-xs text-amber-600">Add and verify a key with credits to enable image & video.</p>
+                )}
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-[#64748b] hover:text-[#6366F1]">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    How it works
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <p className="mt-2 text-xs text-[#64748b]">
+                      Image and video are generated from your post content (or custom captions below). Generated video is posted to LinkedIn when you publish. Your key is stored securely and used only for generation.
+                    </p>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
               <Separator className="bg-[#e2e8f0]" />
-              {kieKeyPaid === false && (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
-                  Add and verify a KIE API key with credits above to enable image and video generation.
-                </div>
-              )}
               <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
                 <Label className="text-sm font-medium text-[#334155] cursor-pointer">Auto-generate image for new posts</Label>
                 <Switch
@@ -542,18 +529,11 @@ const AutomationSettings = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="engage" className="mt-0 focus-visible:outline-none">
-          <Card className="border border-[#e2e8f0] shadow-sm rounded-2xl overflow-hidden bg-white">
+        <TabsContent value="engage" className="mt-6 focus-visible:outline-none">
+          <Card className="border border-[#6B7098]/10 rounded-lg overflow-hidden bg-white shadow-sm">
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-                  <MessageSquare className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-[#0f172a]">Engage Others</CardTitle>
-                  <CardDescription className="text-[#64748b] mt-0.5">Auto-like and comment on other posts</CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-lg font-semibold text-[#10153E]">Engage others</CardTitle>
+              <CardDescription className="text-[#6B7098] text-sm">Auto-like and comment on feed posts</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-0">
               <div className="flex items-center justify-between rounded-xl bg-[#f8fafc] p-4">
@@ -708,18 +688,11 @@ const AutomationSettings = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="reply" className="mt-0 focus-visible:outline-none">
-          <Card className="border border-[#e2e8f0] shadow-sm rounded-2xl overflow-hidden bg-white">
+        <TabsContent value="reply" className="mt-6 focus-visible:outline-none">
+          <Card className="border border-[#6B7098]/10 rounded-lg overflow-hidden bg-white shadow-sm">
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
-                  <Reply className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-[#0f172a]">Reply to Comments</CardTitle>
-                  <CardDescription className="text-[#64748b] mt-0.5">Auto-reply to comments on your posts</CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-lg font-semibold text-[#10153E]">Reply to comments</CardTitle>
+              <CardDescription className="text-[#6B7098] text-sm">Auto-reply to comments on your posts</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-0">
               {subLoading ? null : !isPro ? (
