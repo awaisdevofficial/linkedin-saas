@@ -51,6 +51,12 @@ export async function runPublishJob() {
         });
         published++;
         logger.automation('publish_job_published', { userId, postId: post.id, postUrn });
+        await supabase.insertNotification(userId, {
+          type: 'post_published',
+          title: 'Post published to LinkedIn',
+          message: post.content ? `${(post.content || '').slice(0, 80)}${(post.content || '').length > 80 ? '…' : ''}` : 'Your scheduled post is now live.',
+          link: '/dashboard/posts/activity',
+        });
 
         await sleep(120000);
 

@@ -1071,6 +1071,12 @@ app.post('/api/publish-now', async (req, res) => {
       })().catch((err) => logger.api('publish_now_suggested_comments_error', { error: err.message }));
     }
     logger.api('publish_now_success', { postId, postUrn });
+    await supabaseService.insertNotification(user.id, {
+      type: 'post_published',
+      title: 'Post published to LinkedIn',
+      message: post.content ? `${(post.content || '').slice(0, 80)}${(post.content || '').length > 80 ? '…' : ''}` : 'Your post is now live.',
+      link: '/dashboard/posts/activity',
+    });
     return res.status(200).json({ success: true, postUrn });
   } catch (e) {
     const msg = e?.message || 'Publish failed';

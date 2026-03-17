@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Check, ChevronRight, ChevronLeft, HelpCircle, Eye, EyeOff } from 'lucide-react';
+import { Check, ChevronRight, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { PostoraLogo } from '@/components/PostoraLogo';
+import { LinkedInConnect } from '@/components/linkedin/LinkedInConnect';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 
@@ -40,15 +41,10 @@ const Onboarding = () => {
   const { user } = useAuth();
   const welcomeShown = useRef(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [showCookieHelp, setShowCookieHelp] = useState(false);
-  const [showCookie, setShowCookie] = useState(false);
-  const [showSessionId, setShowSessionId] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    liAtCookie: '',
-    jsessionId: '',
     niche: '',
     audience: '',
     tone: '',
@@ -79,22 +75,6 @@ const Onboarding = () => {
         return;
       }
       const userId = user.id;
-
-      const liAt = formData.liAtCookie.trim();
-      const jsessionId = formData.jsessionId.trim();
-      if (liAt || jsessionId) {
-        const { error: connErr } = await supabase.from('linkedin_connections').upsert(
-          {
-            user_id: userId,
-            li_at_cookie: liAt || null,
-            jsessionid: jsessionId || null,
-            is_active: true,
-            last_connected_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id' }
-        );
-        if (connErr) console.warn('linkedin_connections upsert:', connErr.message);
-      }
 
       const niche = formData.niche ? (nicheMap[formData.niche] || 'tech') : 'tech';
       const postTone = formData.tone ? (toneMap[formData.tone] || 'professional') : 'professional';
@@ -186,80 +166,11 @@ const Onboarding = () => {
         <div className="w-full max-w-xl">
           {currentStep === 1 && (
             <div className="bg-white rounded-[28px] p-8 card-shadow">
-              <h1 className="text-2xl font-bold text-[#10153E] mb-2">Connect your LinkedIn</h1>
+              <h1 className="text-2xl font-bold text-[#10153E] mb-2">Link Your LinkedIn Account</h1>
               <p className="text-[#6B7098] mb-8">
-                We use your LinkedIn session to post and engage on your behalf. You can also connect
-                via OAuth in Settings. You can skip and set this up later if you prefer.
+                POSTORA connects to your existing LinkedIn session to schedule posts and automate engagement on your behalf. Secure, instant, and no password needed.
               </p>
-
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="liAt" className="text-[#10153E]">LinkedIn Cookie (li_at)</Label>
-                    <button
-                      type="button"
-                      onClick={() => setShowCookieHelp(!showCookieHelp)}
-                      className="text-xs text-[#6366F1] flex items-center gap-1"
-                    >
-                      <HelpCircle className="w-3 h-3" />
-                      How to get this?
-                    </button>
-                  </div>
-
-                  {showCookieHelp && (
-                    <div className="bg-[#F6F8FC] rounded-xl p-4 text-sm text-[#6B7098] space-y-2">
-                      <p className="font-medium text-[#10153E]">To find your LinkedIn cookies:</p>
-                      <ol className="list-decimal list-inside space-y-1">
-                        <li>Open linkedin.com in your browser</li>
-                        <li>Press F12 → Application → Cookies → https://www.linkedin.com</li>
-                        <li>Find &quot;li_at&quot; and &quot;JSESSIONID&quot; and copy their values</li>
-                      </ol>
-                    </div>
-                  )}
-
-                  <div className="relative">
-                    <Input
-                      id="liAt"
-                      type={showCookie ? 'text' : 'password'}
-                      placeholder="Paste your li_at cookie here (optional)"
-                      value={formData.liAtCookie}
-                      onChange={(e) => setFormData({ ...formData, liAtCookie: e.target.value })}
-                      className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#6366F1] focus:ring-[#6366F1]/20 pr-12 font-mono text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCookie(!showCookie)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7098] hover:text-[#10153E]"
-                    >
-                      {showCookie ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="jsessionId" className="text-[#10153E]">JSESSIONID (optional)</Label>
-                  <div className="relative">
-                    <Input
-                      id="jsessionId"
-                      type={showSessionId ? 'text' : 'password'}
-                      placeholder="Paste your JSESSIONID here (optional)"
-                      value={formData.jsessionId}
-                      onChange={(e) => setFormData({ ...formData, jsessionId: e.target.value })}
-                      className="h-12 rounded-xl border-[#6B7098]/20 focus:border-[#6366F1] focus:ring-[#6366F1]/20 pr-12 font-mono text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSessionId(!showSessionId)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7098] hover:text-[#10153E]"
-                    >
-                      {showSessionId ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-                  <p className="text-xs text-[#6B7098]">
-                    Optional. You can connect via OAuth or add cookies later in Settings.
-                  </p>
-                </div>
-              </div>
+              <LinkedInConnect showTitle={false} />
             </div>
           )}
 
@@ -356,10 +267,7 @@ const Onboarding = () => {
               <div className="bg-[#F6F8FC] rounded-2xl p-6 text-left space-y-4 mb-8">
                 <div className="flex items-center justify-between">
                   <span className="text-[#6B7098]">LinkedIn</span>
-                  <span className="flex items-center gap-2 text-[#27C696] font-medium">
-                    <Check className="w-4 h-4" />{' '}
-                    {formData.liAtCookie || formData.jsessionId ? 'Cookies saved' : 'Add in Settings'}
-                  </span>
+                  <span className="text-[#10153E] font-medium">Connect in Settings</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[#6B7098]">Niche</span>
@@ -395,7 +303,7 @@ const Onboarding = () => {
                 onClick={handleSkip}
                 disabled={isLoading}
               >
-                Skip for now
+                I&apos;ll do this later
               </Button>
               <Button
                 onClick={handleNext}

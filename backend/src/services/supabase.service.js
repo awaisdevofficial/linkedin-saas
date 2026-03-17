@@ -13,6 +13,28 @@ export function getClient() {
   return client;
 }
 
+/** Insert an in-app notification (real-time in dashboard). Service role bypasses RLS. */
+export async function insertNotification(userId, { type = 'info', title, message = null, link = null }) {
+  try {
+    const supabase = getClient();
+    const { error } = await supabase.from('notifications').insert({
+      user_id: userId,
+      type: type || 'info',
+      title: title || 'Notification',
+      message: message ?? null,
+      link: link ?? null,
+    });
+    if (error) {
+      console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'insertNotification', userId, error: error.message }));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), service: 'supabase', action: 'insertNotification', userId, error: e.message }));
+    return false;
+  }
+}
+
 export async function getAllActiveUsers() {
   try {
     const supabase = getClient();

@@ -4,12 +4,9 @@ import {
   Link2,
   AlertTriangle,
   Save,
-  Eye,
-  EyeOff,
   Trash2,
   Unlink,
   Shield,
-  HelpCircle,
   CheckCircle,
   Key,
   Lock,
@@ -19,6 +16,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LinkedInConnect } from '@/components/linkedin/LinkedInConnect';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -60,9 +58,6 @@ const Settings = () => {
   const tabFromUrl = searchParams.get('tab') || 'profile';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(defaultNotificationSettings);
-  const [showCookie, setShowCookie] = useState(false);
-  const [showSessionId, setShowSessionId] = useState(false);
-  const [showCookieHelp, setShowCookieHelp] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -72,10 +67,10 @@ const Settings = () => {
     email?: string;
     avatar_url?: string;
   } | null>(null);
-  const [linkedIn, setLinkedIn] = useState({ liAt: '', jsessionId: '' });
   const [isLinkedInConnected, setIsLinkedInConnected] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [linkedInConnectKey, setLinkedInConnectKey] = useState(0);
 
   // Sync tab from URL (e.g. /dashboard/settings?tab=notifications)
   useEffect(() => {
@@ -104,12 +99,7 @@ const Settings = () => {
       ]);
       setProfile(profileRes.data as typeof profile);
       const conn = connRes.data as { li_at_cookie?: string; jsessionid?: string } | null;
-      const hasConnection = !!(conn?.li_at_cookie || conn?.jsessionid);
-      setIsLinkedInConnected(hasConnection);
-      setLinkedIn({
-        liAt: conn?.li_at_cookie || '',
-        jsessionId: conn?.jsessionid || '',
-      });
+      setIsLinkedInConnected(!!(conn?.li_at_cookie || conn?.jsessionid));
       const notif = notifRes.data as Partial<NotificationSettings> | null;
       if (notif) {
         setNotificationSettings({
@@ -176,34 +166,6 @@ const Settings = () => {
     window.location.href = `${OAUTH_BACKEND_URL}/auth/linkedin`;
   };
 
-  const handleSaveLinkedIn = async () => {
-    if (!supabase || !user) return;
-    const liAt = linkedIn.liAt.trim();
-    const jsessionId = linkedIn.jsessionId.trim();
-    setSaving('linkedin');
-    try {
-      const { error } = await supabase.from('linkedin_connections').upsert(
-        {
-          user_id: user.id,
-          li_at_cookie: liAt || null,
-          jsessionid: jsessionId || null,
-          is_active: true,
-          last_connected_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      );
-      if (error) throw error;
-      setIsLinkedInConnected(!!(liAt || jsessionId));
-      setLinkedIn({ liAt: liAt || '', jsessionId: jsessionId || '' });
-      toast.success('LinkedIn cookies saved');
-      window.dispatchEvent(new Event('linkedin-connection-updated'));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save cookies');
-    } finally {
-      setSaving(null);
-    }
-  };
-
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError(null);
@@ -240,7 +202,7 @@ const Settings = () => {
         .update({ is_active: false, li_at_cookie: null, jsessionid: null })
         .eq('user_id', user.id);
       setIsLinkedInConnected(false);
-      setLinkedIn({ liAt: '', jsessionId: '' });
+      setLinkedInConnectKey((k) => k + 1);
       setDisconnectDialogOpen(false);
       toast.success('LinkedIn disconnected');
       window.dispatchEvent(new Event('linkedin-connection-updated'));
@@ -453,95 +415,22 @@ const Settings = () => {
                   <span className="w-full border-t border-[#6B7098]/20" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-[#6B7098]">Or use cookie</span>
+                  <span className="bg-white px-2 text-[#6B7098]">Or use extension</span>
                 </div>
               </div>
 
-              <div className="bg-[#F6F8FC] rounded-xl p-4">
-                <button
-                  onClick={() => setShowCookieHelp(!showCookieHelp)}
-                  className="flex items-center gap-2 text-sm text-[#2D5AF6] font-medium"
-                >
-                  <HelpCircle className="w-4 h-4" />
-                  How to get your LinkedIn cookies
-                </button>
-                {showCookieHelp && (
-                  <ol className="mt-3 text-sm text-[#6B7098] space-y-2 list-decimal list-inside">
-                    <li>Open linkedin.com in your browser</li>
-                    <li>Press F12 to open Developer Tools</li>
-                    <li>Go to Application → Cookies → https://www.linkedin.com</li>
-                    <li>Find &quot;li_at&quot; and &quot;JSESSIONID&quot; cookies</li>
-                    <li>Copy their values and paste below</li>
-                  </ol>
-                )}
-              </div>
+              <LinkedInConnect key={linkedInConnectKey} showTitle={false} onConnected={() => setIsLinkedInConnected(true)} />
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>li_at Cookie</Label>
-                  <div className="relative">
-                    <Input
-                      type={showCookie ? 'text' : 'password'}
-                      value={linkedIn.liAt}
-                      onChange={(e) => setLinkedIn({ ...linkedIn, liAt: e.target.value })}
-                      placeholder="Paste your li_at cookie here"
-                      className="pr-12 font-mono text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCookie(!showCookie)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7098]"
-                    >
-                      {showCookie ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>JSESSIONID</Label>
-                  <div className="relative">
-                    <Input
-                      type={showSessionId ? 'text' : 'password'}
-                      value={linkedIn.jsessionId}
-                      onChange={(e) => setLinkedIn({ ...linkedIn, jsessionId: e.target.value })}
-                      placeholder="Paste your JSESSIONID here"
-                      className="pr-12 font-mono text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSessionId(!showSessionId)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7098]"
-                    >
-                      {showSessionId ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
+              {isLinkedInConnected && (
                 <Button
-                  className="bg-[#2D5AF6] hover:bg-[#1E4AD6]"
-                  onClick={handleSaveLinkedIn}
-                  disabled={!!saving}
+                  variant="outline"
+                  className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => setDisconnectDialogOpen(true)}
                 >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save
+                  <Unlink className="w-4 h-4 mr-2" />
+                  Disconnect
                 </Button>
-                {isLinkedInConnected && (
-                  <Button
-                    variant="outline"
-                    className="text-red-600 border-red-200 hover:bg-red-50"
-                    onClick={() => setDisconnectDialogOpen(true)}
-                  >
-                    <Unlink className="w-4 h-4 mr-2" />
-                    Disconnect
-                  </Button>
-                )}
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

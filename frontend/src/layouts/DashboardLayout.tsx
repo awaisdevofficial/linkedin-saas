@@ -15,6 +15,8 @@ import {
   Settings,
   Crown,
   CreditCard,
+  CheckCheck,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +32,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/auth-context';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useNotifications } from '@/hooks/useNotifications';
 import { supabase } from '@/lib/supabase';
 import { FeatureFlagsProvider, useFeatureFlags } from '@/lib/feature-flags-context';
 import { FeatureDisabledPage } from '@/components/FeatureDisabledPage';
@@ -68,6 +71,8 @@ function DashboardLayoutInner() {
   const [searchQuery, setSearchQuery] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<'ok' | 'missing' | 'needsCookies' | 'expired'>('missing');
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const { notifications, loading: notificationsLoading, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
   useEffect(() => {
     if (welcomeTrialShown.current) return;
@@ -266,7 +271,7 @@ function DashboardLayoutInner() {
                 </TooltipTrigger>
                 <TooltipContent>Settings</TooltipContent>
               </Tooltip>
-              <DropdownMenu>
+              <DropdownMenu open={notificationOpen} onOpenChange={setNotificationOpen}>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
@@ -274,19 +279,69 @@ function DashboardLayoutInner() {
                     className="relative p-2 rounded-full hover:bg-[#F6F8FC] transition-colors text-[#6B7098] hover:text-[#10153E] focus:outline-none focus:ring-2 focus:ring-[#6366F1]/20 focus:ring-offset-2"
                   >
                     <Bell className="w-5 h-5" />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-[#6366F1] rounded-full" aria-hidden />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-[#6366F1] text-white text-xs font-medium rounded-full" aria-hidden>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80 p-0 z-[100]" sideOffset={8}>
-                  <div className="px-4 py-3 border-b border-[#6B7098]/10">
+                  <div className="px-4 py-3 border-b border-[#6B7098]/10 flex items-center justify-between">
                     <h3 className="font-semibold text-[#10153E]">Notifications</h3>
+                    {notifications.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); markAllAsRead(); }}
+                        className="text-xs text-[#6366F1] hover:underline flex items-center gap-1"
+                      >
+                        <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                      </button>
+                    )}
                   </div>
                   <div className="max-h-[280px] overflow-y-auto">
-                    <div className="px-4 py-6 text-center text-sm text-[#6B7098]">
-                      <Bell className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                      <p>No new notifications</p>
-                      <p className="text-xs mt-1">Posts and comment activity appear here when you have updates.</p>
-                    </div>
+                    {notificationsLoading ? (
+                      <div className="px-4 py-6 text-center text-sm text-[#6B7098]">Loading…</div>
+                    ) : notifications.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm text-[#6B7098]">
+                        <Bell className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                        <p>No notifications yet</p>
+                        <p className="text-xs mt-1">Posts and comment activity will appear here when you have updates.</p>
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-[#6B7098]/10">
+                        {notifications.map((n) => {
+                          const content = (
+                            <>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium ${!n.read ? 'text-[#10153E]' : 'text-[#6B7098]'}`}>{n.title}</p>
+                                {n.message && <p className="text-xs text-[#6B7098] mt-0.5 line-clamp-2">{n.message}</p>}
+                                <p className="text-xs text-[#6B7098]/80 mt-1">
+                                  {new Date(n.created_at).toLocaleDateString(undefined, { dateStyle: 'short' })}{' '}
+                                  {new Date(n.created_at).toLocaleTimeString(undefined, { timeStyle: 'short' })}
+                                </p>
+                              </div>
+                              {n.link && <ExternalLink className="w-4 h-4 text-[#6B7098] shrink-0 mt-0.5" />}
+                            </>
+                          );
+                          const className = `flex gap-3 px-4 py-3 hover:bg-[#F6F8FC] transition-colors text-left w-full ${!n.read ? 'bg-[#6366F1]/5' : ''}`;
+                          const onClick = () => { if (!n.read) markAsRead(n.id); setNotificationOpen(false); };
+                          return (
+                            <li key={n.id}>
+                              {n.link ? (
+                                <Link to={n.link} onClick={onClick} className={className}>
+                                  {content}
+                                </Link>
+                              ) : (
+                                <button type="button" onClick={onClick} className={className}>
+                                  {content}
+                                </button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
                   <div className="border-t border-[#6B7098]/10 p-2">
                     <DropdownMenuItem asChild>

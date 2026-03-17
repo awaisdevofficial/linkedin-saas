@@ -1,0 +1,12 @@
+{
+  "name": "postora-extension-icons",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Script to generate placeholder icons for POSTORA extension",
+  "scripts": {
+    "icons": "node create-icons.js"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0"
+  }
+}
