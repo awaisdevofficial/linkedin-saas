@@ -28,7 +28,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { InspirationalQuote } from '@/components/InspirationalQuote';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -341,8 +340,6 @@ const DashboardHome = () => {
           <TooltipContent side="bottom" sideOffset={6}>Create a new LinkedIn post</TooltipContent>
         </UITooltip>
       </div>
-
-      <InspirationalQuote variant="card" className="max-w-xl" />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (

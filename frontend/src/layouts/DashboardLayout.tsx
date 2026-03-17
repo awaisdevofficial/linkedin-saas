@@ -6,7 +6,6 @@ import {
   Calendar,
   MessageSquare,
   Zap,
-  Search,
   Bell,
   LogOut,
   Menu,
@@ -18,7 +17,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { InspirationalQuote } from '@/components/InspirationalQuote';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,29 +65,10 @@ function DashboardLayoutInner() {
     : 0;
   const welcomeTrialShown = useRef(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const urlQ = searchParams.get('q') ?? '';
-  const [searchInput, setSearchInput] = useState(urlQ);
   const [connectionStatus, setConnectionStatus] = useState<'ok' | 'missing' | 'needsCookies' | 'expired'>('missing');
   const [profile, setProfile] = useState<{ full_name?: string; avatar_url?: string } | null>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const { notifications, loading: notificationsLoading, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-
-  useEffect(() => {
-    setSearchInput(urlQ);
-  }, [urlQ]);
-
-  const handleSearchChange = (value: string) => {
-    setSearchInput(value);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      const next = new URLSearchParams(searchParams);
-      if (value.trim()) next.set('q', value.trim());
-      else next.delete('q');
-      setSearchParams(next, { replace: true });
-      searchDebounceRef.current = null;
-    }, 300);
-  };
 
   useEffect(() => {
     if (welcomeTrialShown.current) return;
@@ -263,15 +243,8 @@ function DashboardLayoutInner() {
               <Menu className="w-5 h-5" />
             </Button>
 
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7098]" />
-              <Input
-                type="text"
-                placeholder="Search posts, comments..."
-                value={searchInput}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="pl-10 h-10 rounded-full bg-[#F6F8FC] border-none focus:ring-2 focus:ring-[#6366F1]/20"
-              />
+            <div className="flex-1 max-w-md flex items-center min-h-10">
+              <InspirationalQuote variant="inline" className="text-[#6B7098]" />
             </div>
 
             <div className="flex items-center gap-3">

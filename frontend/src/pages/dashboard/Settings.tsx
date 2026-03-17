@@ -239,7 +239,6 @@ const Settings = () => {
           user_id: user.id,
           li_at_cookie: li,
           jsessionid: js,
-          access_token: 'cookie-auth',
           is_active: true,
           cookie_status: 'active',
           last_connected_at: new Date().toISOString(),
