@@ -212,6 +212,8 @@ const Settings = () => {
                     </a>
                     <video
                       src={LI_AT_COOKIES_DEMO_URL}
+                      muted
+                      playsInline
                       controls
                       preload="metadata"
                       className="w-full rounded-lg border border-[#6B7098]/20 bg-black"
