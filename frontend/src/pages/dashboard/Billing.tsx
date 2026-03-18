@@ -15,7 +15,6 @@ const PRO_FEATURES = [
   'LinkedIn auto-reply automation',
   'Bulk post scheduling',
   'RSS content sourcing',
-  'Image watermarking',
   'Priority support',
 ];
 

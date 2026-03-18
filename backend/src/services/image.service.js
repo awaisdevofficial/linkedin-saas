@@ -6,26 +6,6 @@ function getSupabase() {
   return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-function createWatermarkSvg() {
-  return Buffer.from(`
-    <svg width="160" height="36" xmlns="http://www.w3.org/2000/svg">
-      <rect width="160" height="36" rx="8" fill="rgba(0,0,0,0.45)"/>
-      <text
-        x="50%"
-        y="50%"
-        dominant-baseline="middle"
-        text-anchor="middle"
-        font-family="Arial, sans-serif"
-        font-size="15"
-        font-weight="bold"
-        letter-spacing="1.5"
-        fill="white"
-        opacity="0.9"
-      >✈ POSTPILOT</text>
-    </svg>
-  `);
-}
-
 /**
  * Process and upload an image. urlOrBuffer can be:
  * - string: URL to download (e.g. DALL-E)
@@ -44,16 +24,9 @@ export async function processAndUploadImage(userId, urlOrBuffer) {
       imageBuffer = Buffer.from(response.data);
     }
 
-    // 2. Resize to 1200x627 then composite watermark bottom-right
-    const watermark = createWatermarkSvg();
+    // 2. Resize to 1200x627 (no watermark/logo overlay)
     imageBuffer = await sharp(imageBuffer)
       .resize(1200, 627, { fit: 'cover', position: 'center' })
-      .composite([
-        {
-          input: watermark,
-          gravity: 'southeast', // no top/left when using gravity
-        }
-      ])
       .png()
       .toBuffer();
 
