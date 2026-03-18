@@ -1062,7 +1062,9 @@ app.post('/api/automation/trigger-like-comment', async (req, res) => {
     const axios = (await import('axios')).default;
     const axRes = await axios.post(LIKE_COMMENT_WEBHOOK, payload, {
       headers: { 'Content-Type': 'application/json' },
-      timeout: 20000,
+      // Some n8n workflows can take longer than 20s to respond.
+      // We increase the timeout, and also handle timeouts as "accepted" below.
+      timeout: 60000,
       validateStatus: () => true,
       maxRedirects: 0, // avoid redirect (e.g. HTTP→HTTPS) turning POST into GET
     });
@@ -1079,8 +1081,20 @@ app.post('/api/automation/trigger-like-comment', async (req, res) => {
     logger.api('webhook_trigger_failed', { type: 'like_comment', userId: user.id, status: axRes.status });
     return res.status(axRes.status).json({ error: axRes.data?.message || `Webhook returned ${axRes.status}` });
   } catch (e) {
-    logger.api('trigger_like_comment_error', { error: e?.message });
-    return res.status(500).json({ error: e?.message || 'Webhook request failed' });
+    const msg = e?.message || 'Webhook request failed';
+    const fallbackUserId = req.body?.payload?.user_id ?? req.body?.user_id ?? null;
+    const isTimeout =
+      e?.code === 'ECONNABORTED' ||
+      /timeout of \d+ms exceeded/i.test(msg) ||
+      /ETIMEDOUT/i.test(msg);
+    // If n8n takes too long to respond, it may still be processing the workflow.
+    // Return 202 so the UI can show "Run triggered" instead of a hard failure.
+    if (isTimeout) {
+      logger.api('trigger_like_comment_timeout_accepted', { error: msg, type: 'like_comment', userId: fallbackUserId });
+      return res.status(202).json({ success: true, warning: 'Webhook timed out but was submitted' });
+    }
+    logger.api('trigger_like_comment_error', { error: msg });
+    return res.status(500).json({ error: msg });
   }
 });
 
@@ -1146,8 +1160,18 @@ app.post('/api/automation/trigger-reply-comments', async (req, res) => {
     logger.api('webhook_trigger_failed', { type: 'reply_comments', userId: user.id, status: axRes.status });
     return res.status(axRes.status).json({ error: axRes.data?.message || `Webhook returned ${axRes.status}` });
   } catch (e) {
-    logger.api('trigger_reply_comments_error', { error: e?.message });
-    return res.status(500).json({ error: e?.message || 'Webhook request failed' });
+    const msg = e?.message || 'Webhook request failed';
+    const fallbackUserId = req.body?.payload?.user_id ?? req.body?.user_id ?? null;
+    const isTimeout =
+      e?.code === 'ECONNABORTED' ||
+      /timeout of \d+ms exceeded/i.test(msg) ||
+      /ETIMEDOUT/i.test(msg);
+    if (isTimeout) {
+      logger.api('trigger_reply_comments_timeout_accepted', { error: msg, type: 'reply_comments', userId: fallbackUserId });
+      return res.status(202).json({ success: true, warning: 'Webhook timed out but was submitted' });
+    }
+    logger.api('trigger_reply_comments_error', { error: msg });
+    return res.status(500).json({ error: msg });
   }
 });
 

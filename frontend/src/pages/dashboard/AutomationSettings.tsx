@@ -666,9 +666,9 @@ const AutomationSettings = () => {
                         sent_at: new Date().toISOString(),
                       };
                       await apiCalls.triggerLikeAndComment(accessToken, payload);
-                      toast.success('Like & Comment job triggered');
+                      toast.success('Run triggered');
                     } catch (err) {
-                      toast.error(err instanceof Error ? err.message : 'Failed to trigger Like & Comment');
+                      toast.error(err instanceof Error ? err.message : 'Failed to run');
                     } finally {
                       setLikeCommentLoading(false);
                     }
@@ -782,9 +782,9 @@ const AutomationSettings = () => {
                         sent_at: new Date().toISOString(),
                       };
                       await apiCalls.triggerReplyToComments(accessToken, payload);
-                      toast.success('Reply job triggered successfully');
+                      toast.success('Run triggered');
                     } catch (err) {
-                      toast.error(err instanceof Error ? err.message : 'Failed to trigger reply job');
+                      toast.error(err instanceof Error ? err.message : 'Failed to run');
                     } finally {
                       setReplyJobLoading(false);
                     }
