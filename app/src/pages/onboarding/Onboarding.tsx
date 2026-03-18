@@ -15,6 +15,8 @@ const Onboarding = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [showCookieHelp, setShowCookieHelp] = useState(false);
   const [showCookie, setShowCookie] = useState(false);
+  const LI_AT_COOKIES_DEMO_URL =
+    'https://venfdaxnobjhfqyoatap.supabase.co/storage/v1/object/public/videos/Feed%20_%20LinkedIn%20-%20Google%20Chrome%202026-03-19%2002-04-03.mp4';
   const [isLoading, setIsLoading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -105,6 +107,20 @@ const Onboarding = () => {
                         <li>Press F12 → Application → Cookies</li>
                         <li>Find "li_at" and copy the value</li>
                       </ol>
+                      <a
+                        href={LI_AT_COOKIES_DEMO_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-[#6366F1] hover:underline font-medium inline-flex items-center gap-1"
+                      >
+                        Watch demo video: li_at cookies explained
+                      </a>
+                      <video
+                        src={LI_AT_COOKIES_DEMO_URL}
+                        controls
+                        preload="metadata"
+                        className="w-full rounded-lg border border-[#6B7098]/20 bg-black"
+                      />
                     </div>
                   )}
 

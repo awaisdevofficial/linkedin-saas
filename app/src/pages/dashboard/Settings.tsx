@@ -35,6 +35,8 @@ const Settings = () => {
   const [showCookie, setShowCookie] = useState(false);
   const [showSessionId, setShowSessionId] = useState(false);
   const [showCookieHelp, setShowCookieHelp] = useState(false);
+  const LI_AT_COOKIES_DEMO_URL =
+    'https://venfdaxnobjhfqyoatap.supabase.co/storage/v1/object/public/videos/Feed%20_%20LinkedIn%20-%20Google%20Chrome%202026-03-19%2002-04-03.mp4';
   const [isLinkedInConnected, setIsLinkedInConnected] = useState(false);
   
   const [profile, setProfile] = useState({
@@ -197,6 +199,24 @@ const Settings = () => {
                     <li>Find "li_at" and "JSESSIONID" cookies</li>
                     <li>Copy their values and paste below</li>
                   </ol>
+                )}
+                {showCookieHelp && (
+                  <div className="mt-3">
+                    <a
+                      href={LI_AT_COOKIES_DEMO_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-[#6366F1] hover:underline font-medium inline-flex items-center gap-1 mb-3"
+                    >
+                      Watch demo video: li_at cookies explained
+                    </a>
+                    <video
+                      src={LI_AT_COOKIES_DEMO_URL}
+                      controls
+                      preload="metadata"
+                      className="w-full rounded-lg border border-[#6B7098]/20 bg-black"
+                    />
+                  </div>
                 )}
               </div>
 

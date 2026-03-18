@@ -79,6 +79,8 @@ const Settings = () => {
   const linkedInCookiesEditedRef = useRef(false);
   const COOKIE_DRAFT_KEY_LI = 'postora_settings_li_at_draft';
   const COOKIE_DRAFT_KEY_JS = 'postora_settings_jsessionid_draft';
+  const LI_AT_COOKIES_DEMO_URL =
+    'https://venfdaxnobjhfqyoatap.supabase.co/storage/v1/object/public/videos/Feed%20_%20LinkedIn%20-%20Google%20Chrome%202026-03-19%2002-04-03.mp4';
 
   // Restore cookie draft from sessionStorage on mount so it survives tab/remount
   useEffect(() => {
@@ -477,6 +479,22 @@ const Settings = () => {
                 <p className="text-xs text-[#6B7098] mb-3">
                   F12 → Application (Chrome) or Storage (Firefox) → Cookies → linkedin.com → copy li_at and JSESSIONID. Stored securely; disconnect anytime.
                 </p>
+
+                <a
+                  href={LI_AT_COOKIES_DEMO_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-[#6366F1] hover:underline font-medium inline-flex items-center gap-1 mb-3"
+                >
+                  Watch demo video: li_at cookies explained
+                </a>
+
+                <video
+                  src={LI_AT_COOKIES_DEMO_URL}
+                  controls
+                  preload="metadata"
+                  className="w-full rounded-lg border border-[#6B7098]/20 bg-black"
+                />
               </CollapsibleContent>
             </Collapsible>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
