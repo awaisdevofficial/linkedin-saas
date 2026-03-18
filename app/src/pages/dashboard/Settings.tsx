@@ -214,6 +214,14 @@ const Settings = () => {
                       src={LI_AT_COOKIES_DEMO_URL}
                       muted
                       playsInline
+                      onPlay={(e) => {
+                        e.currentTarget.muted = true;
+                        e.currentTarget.volume = 0;
+                      }}
+                      onVolumeChange={(e) => {
+                        e.currentTarget.muted = true;
+                        e.currentTarget.volume = 0;
+                      }}
                       controls
                       preload="metadata"
                       className="w-full rounded-lg border border-[#6B7098]/20 bg-black"
