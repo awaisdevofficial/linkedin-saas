@@ -573,6 +573,54 @@ async function apiAuthGuard(req, res, next) {
 app.use('/api', apiAuthGuard);
 app.use('/api/billing', billingRouter);
 
+async function getProAccessState(userId) {
+  const { data: subRows, error: subErr } = await supabaseAdmin
+    .from('subscriptions')
+    .select('plan, status')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(1);
+  if (subErr) throw subErr;
+
+  const sub = subRows?.[0] ?? null;
+  const plan = sub?.plan || 'free';
+  const status = sub?.status || 'inactive';
+  const hasActiveSub = plan === 'pro' && (status === 'active' || status === 'trialing');
+  if (hasActiveSub) return { allowed: true, plan, status, trial_expired: false };
+
+  const { data: profile, error: profileErr } = await supabaseAdmin
+    .from('profiles')
+    .select('trial_ends_at')
+    .eq('id', userId)
+    .single();
+  if (profileErr) throw profileErr;
+
+  const trialEndsAt = profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null;
+  const trialActive = !!trialEndsAt && trialEndsAt > new Date();
+  return {
+    allowed: trialActive,
+    plan,
+    status,
+    trial_expired: !trialActive,
+  };
+}
+
+async function enforceProAccess(res, userId) {
+  try {
+    const access = await getProAccessState(userId);
+    if (access.allowed) return true;
+    return res.status(403).json({
+      error: 'upgrade_required',
+      required: 'pro',
+      current: access.plan || 'free',
+      trial_expired: true,
+    });
+  } catch (e) {
+    logger.api('pro_access_check_error', { userId, error: e?.message });
+    return res.status(500).json({ error: 'Failed to validate subscription' });
+  }
+}
+
 // GET /api/feature-flags — which dashboard pages are enabled and what message to show when disabled
 app.get('/api/feature-flags', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -608,6 +656,8 @@ app.post('/api/generate', async (req, res) => {
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     const userId = req.body?.userId ?? user.id;
     if (userId !== user.id) {
       return res.status(403).json({ error: 'Forbidden' });
@@ -633,6 +683,8 @@ app.get('/api/settings/generation-paused', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     const supabaseService = await import('./src/services/supabase.service.js');
     const settings = await supabaseService.getUserContentSettings(user.id);
     return res.status(200).json({ generation_paused: settings?.generation_paused === true });
@@ -650,6 +702,8 @@ app.patch('/api/settings/generation-paused', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     const paused = req.body?.paused === true;
     const supabaseService = await import('./src/services/supabase.service.js');
     const ok = await supabaseService.updateUserContentSetting(user.id, 'generation_paused', paused);
@@ -731,6 +785,8 @@ app.post('/api/regenerate-image', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
@@ -770,6 +826,8 @@ app.post('/api/generate-image-for-post', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     logger.api('generate_image_for_post_start', { postId, userId: user.id });
     const supabaseService = await import('./src/services/supabase.service.js');
@@ -825,6 +883,8 @@ app.post('/api/generate-video-for-post', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     logger.api('generate_video_for_post_start', { postId, userId: user.id });
     const supabaseService = await import('./src/services/supabase.service.js');
@@ -874,6 +934,8 @@ app.post('/api/regenerate-post', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     const postId = req.body?.postId;
     if (!postId) return res.status(400).json({ error: 'postId required' });
     const supabaseService = await import('./src/services/supabase.service.js');
@@ -926,6 +988,8 @@ app.post('/api/publish-now', async (req, res) => {
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     const postId = req.body?.postId;
     const contentOnly = req.body?.contentOnly === true;
     if (!postId) {
@@ -1054,6 +1118,8 @@ app.post('/api/automation/trigger-like-comment', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
     const payload = req.body?.payload ?? req.body;
     if (!payload || payload.user_id !== user.id) {
       return res.status(400).json({ error: 'Invalid payload or user_id mismatch' });
@@ -1110,30 +1176,8 @@ app.post('/api/automation/trigger-reply-comments', async (req, res) => {
   try {
     const { data: { user } } = await supabaseAdmin.auth.getUser(token);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    // Enforce Pro subscription for auto-reply automation.
-    // Free users (or canceled/expired subs) are blocked from triggering this job.
-    const { data: subRows, error: subErr } = await supabaseAdmin
-      .from('subscriptions')
-      .select('plan, status')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-    if (subErr) {
-      logger.api('subscription_check_error', { error: subErr?.message });
-      return res.status(500).json({ error: 'Server error' });
-    }
-    const sub = subRows?.[0] ?? null;
-    const plan = sub?.plan || 'free';
-    const status = sub?.status || 'inactive';
-    const allowed = plan === 'pro' && (status === 'active' || status === 'trialing');
-    if (!allowed) {
-      return res.status(403).json({
-        error: 'upgrade_required',
-        required: 'pro',
-        current: plan,
-      });
-    }
+    const hasProAccess = await enforceProAccess(res, user.id);
+    if (hasProAccess !== true) return hasProAccess;
 
     const payload = req.body?.payload ?? req.body;
     if (!payload || payload.user_id !== user.id) {

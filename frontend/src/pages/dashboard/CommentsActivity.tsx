@@ -102,6 +102,10 @@ const CommentsActivity = () => {
   const [viewItem, setViewItem] = useState<ActivityItem | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [profile, setProfile] = useState<{ avatar_url?: string } | null>(null);
+  const [engagementTotals, setEngagementTotals] = useState<{ likes: number; comments: number }>({
+    likes: 0,
+    comments: 0,
+  });
 
   useEffect(() => {
     if (!supabase || !user) {
@@ -126,7 +130,7 @@ const CommentsActivity = () => {
         }
       })();
 
-      const [logsRes, commentRepliesRes, replyLogsData, profileRes] = await Promise.all([
+      const [logsRes, commentRepliesRes, replyLogsData, profileRes, likesCountRes, commentsCountRes] = await Promise.all([
         client
           .from('engagement_logs')
           .select('id, action, post_uri, activity_id, post_content, comment_text, status, executed_at, created_at, author_urn, author_name, author_headline, author_profile_url, permalink, media_type, original_activity_id, was_reshare, liked, commented, description')
@@ -141,6 +145,16 @@ const CommentsActivity = () => {
           .limit(100),
         replyLogsPromise,
         client.from('profiles').select('avatar_url').eq('id', userId).maybeSingle(),
+        client
+          .from('engagement_logs')
+          .select('id', { head: true, count: 'exact' })
+          .eq('user_id', userId)
+          .eq('action', 'like'),
+        client
+          .from('engagement_logs')
+          .select('id', { head: true, count: 'exact' })
+          .eq('user_id', userId)
+          .eq('action', 'comment'),
       ]);
 
       const logs = (logsRes.data as EngagementLog[]) || [];
@@ -179,6 +193,10 @@ const CommentsActivity = () => {
       setEngagementLogs(logs);
       setCommentReplies(replies);
       setProfile((profileRes.data as { avatar_url?: string }) || null);
+      setEngagementTotals({
+        likes: likesCountRes.count ?? 0,
+        comments: commentsCountRes.count ?? 0,
+      });
       setLoading(false);
     };
     fetchData();
@@ -309,8 +327,8 @@ const CommentsActivity = () => {
     );
   };
 
-  const likesCount = engagementLogs.filter((l) => l.action === 'like').length;
-  const commentsCount = engagementLogs.filter((l) => l.action === 'comment').length;
+  const likesCount = engagementTotals.likes;
+  const commentsCount = engagementTotals.comments;
   const repliesCount = commentReplies.length;
 
   if (loading) {

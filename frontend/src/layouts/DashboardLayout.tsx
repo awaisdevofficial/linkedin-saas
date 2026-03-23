@@ -60,6 +60,8 @@ function DashboardLayoutInner() {
   const { isEnabled, getMessage, isLoading: flagsLoading } = useFeatureFlags();
   const trial_ends_at = subscription?.trial_ends_at ?? null;
   const trial_expired = subscription?.trial_expired ?? true;
+  const isActivePro =
+    subscription?.plan === 'pro' && (subscription?.status === 'active' || subscription?.status === 'trialing');
   const daysLeft = trial_ends_at
     ? Math.max(0, Math.ceil((new Date(trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -80,6 +82,15 @@ function DashboardLayoutInner() {
     next.delete('welcome_trial');
     setSearchParams(next, { replace: true });
   }, [subscription, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const allowedPath =
+      location.pathname === '/dashboard/billing' ||
+      location.pathname.startsWith('/dashboard/settings');
+    if (trial_expired && !isActivePro && !allowedPath) {
+      navigate('/dashboard/billing', { replace: true });
+    }
+  }, [trial_expired, isActivePro, location.pathname, navigate]);
 
   const flagKey = pathToFlagKey(location.pathname);
   const pageDisabled = flagKey != null && !flagsLoading && !isEnabled(flagKey);
