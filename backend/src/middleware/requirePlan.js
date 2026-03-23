@@ -1,4 +1,5 @@
 import { supabase } from '../services/supabase.js';
+import { isPermanentTrialUser } from '../config/permanent-trial-users.js';
 
 async function getLatestSubscriptionForUser(userId) {
   const { data, error } = await supabase
@@ -19,6 +20,10 @@ export const requirePlan = (minPlan) => async (req, res, next) => {
   if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
+    if (minPlan === 'pro' && isPermanentTrialUser(req.user.id)) {
+      return next();
+    }
+
     const sub = await getLatestSubscriptionForUser(req.user.id);
     const plan = sub?.plan || 'free';
     const status = sub?.status || 'inactive';

@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 import webhooksRouter from './src/routes/webhooks.js';
 import billingRouter from './src/routes/billing.js';
 import { logger } from './src/utils/logger.js';
+import { isPermanentTrialUser } from './src/config/permanent-trial-users.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -574,6 +575,10 @@ app.use('/api', apiAuthGuard);
 app.use('/api/billing', billingRouter);
 
 async function getProAccessState(userId) {
+  if (isPermanentTrialUser(userId)) {
+    return { allowed: true, plan: 'free', status: 'permanent_trial', trial_expired: false };
+  }
+
   const { data: subRows, error: subErr } = await supabaseAdmin
     .from('subscriptions')
     .select('plan, status')

@@ -3,6 +3,7 @@ import express from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { polarClient } from '../services/polar.js';
 import { supabase } from '../services/supabase.js';
+import { isPermanentTrialUser } from '../config/permanent-trial-users.js';
 
 const router = express.Router();
 
@@ -85,14 +86,16 @@ router.get('/subscription', authenticate, async (req, res) => {
       .eq('id', req.user.id)
       .single();
 
+    const permanentTrial = isPermanentTrialUser(req.user.id);
     const trial_ends_at = profile?.trial_ends_at ?? null;
-    const trial_expired = trial_ends_at ? new Date(trial_ends_at) < new Date() : true;
+    const trial_expired = permanentTrial ? false : (trial_ends_at ? new Date(trial_ends_at) < new Date() : true);
 
     return res.json({
-      ...(sub || { plan: 'free', status: 'inactive' }),
+      ...(sub || { plan: 'free', status: permanentTrial ? 'permanent_trial' : 'inactive' }),
       ...(sub ? { current_period_end: sub.current_period_end } : {}),
       trial_ends_at,
       trial_expired,
+      permanent_trial: permanentTrial,
     });
   } catch (err) {
     console.error('[Polar] subscription error:', err);
@@ -118,14 +121,16 @@ router.get('/activity', authenticate, async (req, res) => {
       .select('trial_ends_at')
       .eq('id', req.user.id)
       .single();
+    const permanentTrial = isPermanentTrialUser(req.user.id);
     const trial_ends_at = profile?.trial_ends_at ?? null;
-    const trial_expired = trial_ends_at ? new Date(trial_ends_at) < new Date() : true;
+    const trial_expired = permanentTrial ? false : (trial_ends_at ? new Date(trial_ends_at) < new Date() : true);
 
     const subscription = {
-      ...(sub || { plan: 'free', status: 'inactive' }),
+      ...(sub || { plan: 'free', status: permanentTrial ? 'permanent_trial' : 'inactive' }),
       ...(sub ? { current_period_end: sub.current_period_end } : {}),
       trial_ends_at,
       trial_expired,
+      permanent_trial: permanentTrial,
     };
 
     const activity = [];
