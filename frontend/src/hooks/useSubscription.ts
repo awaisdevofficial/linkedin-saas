@@ -11,6 +11,7 @@ export interface Subscription {
   current_period_end?: string;
   trial_ends_at?: string | null;
   trial_expired?: boolean;
+  permanent_trial?: boolean;
 }
 
 export function useSubscription() {

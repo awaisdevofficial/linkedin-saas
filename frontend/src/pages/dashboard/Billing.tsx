@@ -37,6 +37,7 @@ export default function Billing() {
     subscription?.plan === 'pro' && (subscription?.status === 'active' || subscription?.status === 'trialing');
   const trial_ends_at = subscription?.trial_ends_at ?? null;
   const trial_expired = subscription?.trial_expired ?? true;
+  const permanentTrial = subscription?.permanent_trial === true;
   const daysLeft = trial_ends_at
     ? Math.max(0, Math.ceil((new Date(trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -102,13 +103,19 @@ export default function Billing() {
         <p className="text-sm text-[#6B7098]">Manage your plan and view billing activity</p>
       </div>
 
-      {!trial_expired && trial_ends_at && (
+      {permanentTrial ? (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
+          <p className="text-sm font-medium text-amber-700">
+            Lucky you! You are on a VVIP pass with permanent trial access.
+          </p>
+        </div>
+      ) : (!trial_expired && trial_ends_at && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
           <p className="text-sm font-medium text-amber-700">
             Your free trial expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''} — upgrade to keep full access
           </p>
         </div>
-      )}
+      ))}
 
       {trial_expired && !isActivePro && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">

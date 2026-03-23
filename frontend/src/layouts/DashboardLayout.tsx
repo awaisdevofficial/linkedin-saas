@@ -60,6 +60,7 @@ function DashboardLayoutInner() {
   const { isEnabled, getMessage, isLoading: flagsLoading } = useFeatureFlags();
   const trial_ends_at = subscription?.trial_ends_at ?? null;
   const trial_expired = subscription?.trial_expired ?? true;
+  const permanentTrial = subscription?.permanent_trial === true;
   const isActivePro =
     subscription?.plan === 'pro' && (subscription?.status === 'active' || subscription?.status === 'trialing');
   const daysLeft = trial_ends_at
@@ -234,14 +235,18 @@ function DashboardLayoutInner() {
       </Sheet>
 
       <div className="flex-1 flex flex-col min-h-0 lg:ml-64">
-        {!trial_expired && trial_ends_at && daysLeft <= 3 && (
+        {permanentTrial ? (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800 shrink-0">
+            🎉 Lucky you! You unlocked a VVIP pass with unlimited trial access. Enjoy the full ride!
+          </div>
+        ) : (!trial_expired && trial_ends_at && daysLeft <= 3 && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800 shrink-0">
             ⏳ {daysLeft} day{daysLeft !== 1 ? 's' : ''} left on your free trial —{' '}
             <Link to="/dashboard/billing" className="font-semibold underline ml-1">
               Upgrade to Pro
             </Link>
           </div>
-        )}
+        ))}
         <header className="bg-white border-b border-[#6B7098]/10 px-4 sm:px-6 py-4 shrink-0">
           <div className="flex items-center justify-between gap-4">
             <Button
