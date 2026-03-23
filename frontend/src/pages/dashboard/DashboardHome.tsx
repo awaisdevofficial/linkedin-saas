@@ -60,7 +60,7 @@ type CommentReply = {
 };
 
 const fetchAll = async (client: SupabaseClient, userId: string) => {
-  const [postsRes, logsRes, repliesRes, connRes] = await Promise.all([
+  const [postsRes, logsRes, repliesRes, connRes, likesCountRes, commentsCountRes] = await Promise.all([
     client
       .from('posts')
       .select('id, hook, content, status, posted, posted_at, created_at, scheduled_at')
@@ -85,12 +85,26 @@ const fetchAll = async (client: SupabaseClient, userId: string) => {
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle(),
+    client
+      .from('engagement_logs')
+      .select('id', { head: true, count: 'exact' })
+      .eq('user_id', userId)
+      .eq('action', 'like'),
+    client
+      .from('engagement_logs')
+      .select('id', { head: true, count: 'exact' })
+      .eq('user_id', userId)
+      .eq('action', 'comment'),
   ]);
   return {
     posts: (postsRes.data as Post[]) || [],
     engagementLogs: (logsRes.data as EngagementLog[]) || [],
     commentReplies: (repliesRes.data as CommentReply[]) || [],
     linkedInConnected: !!connRes.data,
+    totals: {
+      likes: likesCountRes.count ?? 0,
+      comments: commentsCountRes.count ?? 0,
+    },
   };
 };
 
@@ -102,6 +116,10 @@ const DashboardHome = () => {
   const [engagementLogs, setEngagementLogs] = useState<EngagementLog[]>([]);
   const [commentReplies, setCommentReplies] = useState<CommentReply[]>([]);
   const [linkedInConnected, setLinkedInConnected] = useState(false);
+  const [engagementTotals, setEngagementTotals] = useState<{ likes: number; comments: number }>({
+    likes: 0,
+    comments: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -117,6 +135,7 @@ const DashboardHome = () => {
         setEngagementLogs(r.engagementLogs);
         setCommentReplies(r.commentReplies);
         setLinkedInConnected(r.linkedInConnected);
+        setEngagementTotals(r.totals);
         setLoading(false);
       });
 
@@ -188,8 +207,8 @@ const DashboardHome = () => {
   ];
 
   const quickStats = [
-    { label: 'Likes given', value: String(engagementLogs.filter((l) => l.action === 'like').length) },
-    { label: 'Comments made', value: String(engagementLogs.filter((l) => l.action === 'comment').length) },
+    { label: 'Likes given', value: String(engagementTotals.likes) },
+    { label: 'Comments made', value: String(engagementTotals.comments) },
     { label: 'Replies sent', value: String(commentReplies.length) },
     { label: 'Posts this week', value: String(posts.filter((p) => p.posted).length) },
   ];
