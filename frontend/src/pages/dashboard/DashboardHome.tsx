@@ -60,7 +60,7 @@ type CommentReply = {
 };
 
 const fetchAll = async (client: SupabaseClient, userId: string) => {
-  const [postsRes, logsRes, repliesRes, connRes, likesCountRes, commentsCountRes] = await Promise.all([
+  const [postsRes, logsRes, repliesRes, connRes, likesCountRes, commentsCountRes, logsTotalRes, repliesTotalRes] = await Promise.all([
     client
       .from('posts')
       .select('id, hook, content, status, posted, posted_at, created_at, scheduled_at')
@@ -95,6 +95,14 @@ const fetchAll = async (client: SupabaseClient, userId: string) => {
       .select('id', { head: true, count: 'exact' })
       .eq('user_id', userId)
       .eq('action', 'comment'),
+    client
+      .from('engagement_logs')
+      .select('id', { head: true, count: 'exact' })
+      .eq('user_id', userId),
+    client
+      .from('comment_replies')
+      .select('id', { head: true, count: 'exact' })
+      .eq('user_id', userId),
   ]);
   return {
     posts: (postsRes.data as Post[]) || [],
@@ -102,8 +110,10 @@ const fetchAll = async (client: SupabaseClient, userId: string) => {
     commentReplies: (repliesRes.data as CommentReply[]) || [],
     linkedInConnected: !!connRes.data,
     totals: {
+      engagements: logsTotalRes.count ?? 0,
       likes: likesCountRes.count ?? 0,
       comments: commentsCountRes.count ?? 0,
+      replies: repliesTotalRes.count ?? 0,
     },
   };
 };
@@ -116,9 +126,16 @@ const DashboardHome = () => {
   const [engagementLogs, setEngagementLogs] = useState<EngagementLog[]>([]);
   const [commentReplies, setCommentReplies] = useState<CommentReply[]>([]);
   const [linkedInConnected, setLinkedInConnected] = useState(false);
-  const [engagementTotals, setEngagementTotals] = useState<{ likes: number; comments: number }>({
+  const [engagementTotals, setEngagementTotals] = useState<{
+    engagements: number;
+    likes: number;
+    comments: number;
+    replies: number;
+  }>({
+    engagements: 0,
     likes: 0,
     comments: 0,
+    replies: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -199,9 +216,9 @@ const DashboardHome = () => {
     },
     {
       label: 'Engagements',
-      value: String(engagementLogs.length),
+      value: String(engagementTotals.engagements),
       icon: Heart,
-      change: engagementLogs.length > 0 ? 'Today' : '-',
+      change: engagementTotals.engagements > 0 ? 'Today' : '-',
       color: 'purple',
     },
   ];
@@ -209,7 +226,7 @@ const DashboardHome = () => {
   const quickStats = [
     { label: 'Likes given', value: String(engagementTotals.likes) },
     { label: 'Comments made', value: String(engagementTotals.comments) },
-    { label: 'Replies sent', value: String(commentReplies.length) },
+    { label: 'Replies sent', value: String(engagementTotals.replies) },
     { label: 'Posts this week', value: String(posts.filter((p) => p.posted).length) },
   ];
 
