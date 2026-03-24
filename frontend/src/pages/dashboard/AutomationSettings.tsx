@@ -17,9 +17,9 @@ import { useSubscription } from '@/hooks/useSubscription';
 
 const niches = ['Tech', 'Marketing', 'Finance', 'Sales', 'HR', 'AI', 'Custom'];
 
+const ENGAGEMENT_INTERVAL_MIN_MINUTES = 60;
+
 const ENGAGEMENT_INTERVAL_OPTIONS = [
-  { value: 15, label: '15 minutes' },
-  { value: 30, label: '30 minutes' },
   { value: 60, label: '1 hour' },
   { value: 120, label: '2 hours' },
   { value: 360, label: '6 hours' },
@@ -82,7 +82,20 @@ const AutomationSettings = () => {
           .maybeSingle(),
       ]);
       setContentSettings(settingsRes.data as typeof contentSettings);
-      setEngageSettings((engageRes.data as Record<string, unknown>) ?? {});
+      const row = (engageRes.data as Record<string, unknown>) ?? {};
+      const engM = Number(row.engagement_interval_minutes);
+      const repM = Number(row.reply_interval_minutes);
+      setEngageSettings({
+        ...row,
+        engagement_interval_minutes: Math.min(
+          10080,
+          Math.max(ENGAGEMENT_INTERVAL_MIN_MINUTES, Number.isFinite(engM) && engM > 0 ? engM : 60)
+        ),
+        reply_interval_minutes: Math.min(
+          10080,
+          Math.max(ENGAGEMENT_INTERVAL_MIN_MINUTES, Number.isFinite(repM) && repM > 0 ? repM : 60)
+        ),
+      });
       setLoading(false);
     };
     fetch();
@@ -153,8 +166,22 @@ const AutomationSettings = () => {
     if (!supabase || !user) return;
     setSaving('engage');
     try {
+      const raw = engageSettings as Record<string, unknown>;
+      const engagementM = Number(raw.engagement_interval_minutes);
+      const replyM = Number(raw.reply_interval_minutes);
       await supabase.from('engagement_settings').upsert(
-        { user_id: user.id, ...engageSettings },
+        {
+          ...raw,
+          user_id: user.id,
+          engagement_interval_minutes: Math.min(
+            10080,
+            Math.max(ENGAGEMENT_INTERVAL_MIN_MINUTES, Number.isFinite(engagementM) && engagementM > 0 ? engagementM : 60)
+          ),
+          reply_interval_minutes: Math.min(
+            10080,
+            Math.max(ENGAGEMENT_INTERVAL_MIN_MINUTES, Number.isFinite(replyM) && replyM > 0 ? replyM : 60)
+          ),
+        },
         { onConflict: 'user_id' }
       );
       toast.success('Engagement settings saved');
@@ -546,9 +573,9 @@ const AutomationSettings = () => {
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-[#334155]">Run feed engagement every</Label>
-                <p className="text-xs text-[#64748b]">How often to run the like & comment job (e.g. every 1 hour or 2 hours).</p>
+                <p className="text-xs text-[#64748b]">How often to run the like & comment job (minimum every 1 hour).</p>
                 <select
-                  value={Math.min(10080, Math.max(15, Number(engageSettings?.engagement_interval_minutes) || 60))}
+                  value={Math.min(10080, Math.max(ENGAGEMENT_INTERVAL_MIN_MINUTES, Number(engageSettings?.engagement_interval_minutes) || 60))}
                   onChange={(e) => setEngageSettings((s) => ({ ...s, engagement_interval_minutes: Number(e.target.value) }))}
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
                 >
@@ -657,7 +684,13 @@ const AutomationSettings = () => {
                         person_urn: connection.person_urn,
                         auto_liking: settings.auto_liking !== false,
                         auto_commenting: settings.auto_commenting !== false,
-                        engagement_interval_minutes: Number(settings.engagement_interval_minutes) || 60,
+                        engagement_interval_minutes: Math.min(
+                          10080,
+                          Math.max(
+                            ENGAGEMENT_INTERVAL_MIN_MINUTES,
+                            Number(settings.engagement_interval_minutes) || 60
+                          )
+                        ),
                         comment_prompt: (settings.comment_prompt as string) ?? null,
                         active_days: (settings.active_days as string[]) ?? [],
                         active_start_time: (settings.active_start_time as string) ?? '08:00',
@@ -717,9 +750,9 @@ const AutomationSettings = () => {
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-[#334155]">Run reply-to-comments every</Label>
-                <p className="text-xs text-[#64748b]">How often to run the reply job (same interval options as feed engagement). Uses the same active days and time window (UTC) as above.</p>
+                <p className="text-xs text-[#64748b]">How often to run the reply job (minimum every 1 hour; same options as feed engagement). Uses the same active days and time window (UTC) as above.</p>
                 <select
-                  value={Math.min(10080, Math.max(15, Number(engageSettings?.reply_interval_minutes) || 60))}
+                  value={Math.min(10080, Math.max(ENGAGEMENT_INTERVAL_MIN_MINUTES, Number(engageSettings?.reply_interval_minutes) || 60))}
                   onChange={(e) => setEngageSettings((s) => ({ ...s, reply_interval_minutes: Number(e.target.value) }))}
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
                 >
@@ -771,11 +804,16 @@ const AutomationSettings = () => {
                         toast.error('No published posts found to monitor for replies.');
                         return;
                       }
+                      const replyInterval = Number(settings.reply_interval_minutes);
                       const payload = {
                         user_id: String(settings.user_id),
                         person_urn: connection.person_urn,
                         auto_replying: true,
                         comment_prompt: (settings.comment_prompt as string) ?? null,
+                        reply_interval_minutes: Math.min(
+                          10080,
+                          Math.max(ENGAGEMENT_INTERVAL_MIN_MINUTES, Number.isFinite(replyInterval) && replyInterval > 0 ? replyInterval : 60)
+                        ),
                         active_days: (settings.active_days as string[]) ?? [],
                         active_start_time: (settings.active_start_time as string) ?? '08:00',
                         active_end_time: (settings.active_end_time as string) ?? '20:00',

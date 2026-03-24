@@ -34,12 +34,12 @@ function isInActiveWindow(settings) {
 
 /**
  * Returns true if this user is due for a webhook send.
- * Each user has their own engagement_interval_minutes and webhook_last_sent_at;
+ * Each user has their own engagement_interval_minutes (min 1 hour) and webhook_last_sent_at;
  * we only send when (now - webhook_last_sent_at) >= that user's interval.
  */
 function isDueForWebhook(user) {
   const lastSent = user.webhook_last_sent_at ? new Date(user.webhook_last_sent_at) : null;
-  const intervalMinutes = Number(user.engagement_interval_minutes) || 30;
+  const intervalMinutes = supabase.normalizeEngagementIntervalMinutes(user.engagement_interval_minutes ?? 60);
   const intervalMs = intervalMinutes * 60 * 1000;
   if (!lastSent) return true;
   const elapsed = Date.now() - lastSent.getTime();
@@ -53,7 +53,7 @@ function buildWebhookPayload(user) {
     person_urn: user.person_urn || null,
     auto_liking: user.auto_liking,
     auto_commenting: user.auto_commenting,
-    engagement_interval_minutes: user.engagement_interval_minutes,
+    engagement_interval_minutes: supabase.normalizeEngagementIntervalMinutes(user.engagement_interval_minutes ?? 60),
     comment_prompt: user.comment_prompt || null,
     active_days: user.active_days || [],
     active_start_time: user.active_start_time || '08:00',
@@ -87,7 +87,7 @@ export async function runWebhookLikeCommentJob() {
         if (!isDueForWebhook(user)) {
           logger.automation('webhook_like_comment_skipped_interval', {
             userId: user.user_id,
-            intervalMinutes: user.engagement_interval_minutes ?? 30,
+            intervalMinutes: supabase.normalizeEngagementIntervalMinutes(user.engagement_interval_minutes ?? 60),
             webhook_last_sent_at: user.webhook_last_sent_at || null,
           });
           continue;

@@ -38,7 +38,7 @@ function isInActiveWindow(settings) {
  */
 function isDueForReplyWebhook(user) {
   const lastSent = user.reply_webhook_last_sent_at ? new Date(user.reply_webhook_last_sent_at) : null;
-  const intervalMinutes = Number(user.reply_interval_minutes) || 30;
+  const intervalMinutes = supabase.normalizeEngagementIntervalMinutes(user.reply_interval_minutes ?? 60);
   const intervalMs = intervalMinutes * 60 * 1000;
   if (!lastSent) return true;
   const elapsed = Date.now() - lastSent.getTime();
@@ -52,7 +52,7 @@ function buildReplyWebhookPayload(user) {
     person_urn: user.person_urn || null,
     auto_replying: true,
     comment_prompt: user.comment_prompt || null,
-    reply_interval_minutes: user.reply_interval_minutes ?? 30,
+    reply_interval_minutes: supabase.normalizeEngagementIntervalMinutes(user.reply_interval_minutes ?? 60),
     active_days: user.active_days || [],
     active_start_time: user.active_start_time || '08:00',
     active_end_time: user.active_end_time || '20:00',
@@ -91,7 +91,7 @@ export async function runWebhookReplyCommentsJob() {
         if (!isDueForReplyWebhook(user)) {
           logger.automation('webhook_reply_comments_skipped_interval', {
             userId: user.user_id,
-            reply_interval_minutes: user.reply_interval_minutes ?? 30,
+            reply_interval_minutes: supabase.normalizeEngagementIntervalMinutes(user.reply_interval_minutes ?? 60),
             reply_webhook_last_sent_at: user.reply_webhook_last_sent_at || null,
           });
           continue;

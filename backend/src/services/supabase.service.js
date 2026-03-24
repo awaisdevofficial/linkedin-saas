@@ -13,6 +13,16 @@ export function getClient() {
   return client;
 }
 
+const ENGAGEMENT_INTERVAL_MIN = 60;
+const ENGAGEMENT_INTERVAL_MAX = 10080;
+
+/** Like/comment and reply webhook intervals: minimum 1 hour, cap 1 week (matches dashboard options). */
+export function normalizeEngagementIntervalMinutes(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return ENGAGEMENT_INTERVAL_MIN;
+  return Math.min(ENGAGEMENT_INTERVAL_MAX, Math.max(ENGAGEMENT_INTERVAL_MIN, Math.round(n)));
+}
+
 /** Insert an in-app notification (real-time in dashboard). Service role bypasses RLS. */
 export async function insertNotification(userId, { type = 'info', title, message = null, link = null }) {
   try {
@@ -246,8 +256,8 @@ export async function getEngagementSettings(userId) {
       auto_liking: data.auto_liking !== false,
       auto_commenting: data.auto_commenting !== false,
       auto_replying: data.auto_replying !== false,
-      engagement_interval_minutes: data.engagement_interval_minutes ?? 30,
-      reply_interval_minutes: data.reply_interval_minutes ?? 30,
+      engagement_interval_minutes: normalizeEngagementIntervalMinutes(data.engagement_interval_minutes ?? 60),
+      reply_interval_minutes: normalizeEngagementIntervalMinutes(data.reply_interval_minutes ?? 60),
       reply_to_reply_interval_minutes: data.reply_to_reply_interval_minutes ?? 60,
       max_engagements_per_day: data.max_engagements_per_day ?? 50,
     };
@@ -580,7 +590,7 @@ export async function getUsersWithAutoLikeCommentEnabled() {
         csrfToken: c.jsessionid || undefined,
         auto_liking: autoLike,
         auto_commenting: autoComment,
-        engagement_interval_minutes: settings.engagement_interval_minutes ?? 30,
+        engagement_interval_minutes: normalizeEngagementIntervalMinutes(settings.engagement_interval_minutes ?? 60),
         webhook_last_sent_at: settings.webhook_last_sent_at ?? null,
         comment_prompt: settings.comment_prompt ?? null,
         active_days: settings.active_days ?? [],
@@ -693,7 +703,7 @@ export async function getUsersWithAutoReplyEnabled() {
         active_days: settings.active_days ?? [],
         active_start_time: (settings.active_start_time ?? '08:00').toString().slice(0, 5),
         active_end_time: (settings.active_end_time ?? '20:00').toString().slice(0, 5),
-        reply_interval_minutes: settings.reply_interval_minutes ?? 30,
+        reply_interval_minutes: normalizeEngagementIntervalMinutes(settings.reply_interval_minutes ?? 60),
         reply_webhook_last_sent_at: settings.reply_webhook_last_sent_at ?? null,
       });
     }

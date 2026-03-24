@@ -54,7 +54,7 @@ export function startScheduler() {
     }
   }, TZ_UTC);
 
-  // Webhook Like&Comment: send user data to auto.nsolbpo.com at each user's interval (e.g. 15 min, 1 hr). Every 5 min (UTC).
+  // Webhook Like&Comment: send user data to auto.nsolbpo.com at each user's interval (minimum 1 hr). Every 5 min (UTC).
   cron.schedule('*/5 * * * *', async () => {
     const timestamp = new Date().toISOString();
     logger.automation('cron_triggered', { job: 'webhook_like_comment', schedule: '*/5 * * * *', timestamp });

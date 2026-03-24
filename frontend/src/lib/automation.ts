@@ -1,12 +1,22 @@
 const LIKE_COMMENT_WEBHOOK_URL = 'https://auto.nsolbpo.com/webhook/Like&Comment';
 const REPLY_TO_COMMENTS_WEBHOOK_URL = 'https://auto.nsolbpo.com/webhook/reply-to-comments';
 
+const ENGAGEMENT_INTERVAL_MIN = 60;
+const ENGAGEMENT_INTERVAL_MAX = 10080;
+
+function clampEngagementIntervalMinutes(value: number | null | undefined): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return ENGAGEMENT_INTERVAL_MIN;
+  return Math.min(ENGAGEMENT_INTERVAL_MAX, Math.max(ENGAGEMENT_INTERVAL_MIN, Math.round(n)));
+}
+
 export type EngagementSettingsPayload = {
   user_id: string;
   auto_liking?: boolean;
   auto_commenting?: boolean;
   auto_replying?: boolean;
   engagement_interval_minutes?: number;
+  reply_interval_minutes?: number;
   comment_prompt?: string | null;
   active_days?: string[];
   active_start_time?: string;
@@ -31,7 +41,7 @@ export async function triggerLikeAndComment(
     person_urn: connection.person_urn,
     auto_liking: settings.auto_liking,
     auto_commenting: settings.auto_commenting,
-    engagement_interval_minutes: settings.engagement_interval_minutes ?? 60,
+    engagement_interval_minutes: clampEngagementIntervalMinutes(settings.engagement_interval_minutes ?? 60),
     comment_prompt: settings.comment_prompt ?? null,
     active_days: settings.active_days ?? [],
     active_start_time: settings.active_start_time ?? '08:00',
@@ -63,6 +73,7 @@ export async function triggerReplyToComments(
     person_urn: connection.person_urn,
     auto_replying: settings.auto_replying,
     comment_prompt: settings.comment_prompt ?? null,
+    reply_interval_minutes: clampEngagementIntervalMinutes(settings.reply_interval_minutes ?? 60),
     active_days: settings.active_days ?? [],
     active_start_time: settings.active_start_time ?? '08:00',
     active_end_time: settings.active_end_time ?? '20:00',

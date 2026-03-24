@@ -11,6 +11,7 @@ import webhooksRouter from './src/routes/webhooks.js';
 import billingRouter from './src/routes/billing.js';
 import { logger } from './src/utils/logger.js';
 import { isPermanentTrialUser } from './src/config/permanent-trial-users.js';
+import { normalizeEngagementIntervalMinutes } from './src/services/supabase.service.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -1129,6 +1130,9 @@ app.post('/api/automation/trigger-like-comment', async (req, res) => {
     if (!payload || payload.user_id !== user.id) {
       return res.status(400).json({ error: 'Invalid payload or user_id mismatch' });
     }
+    payload.engagement_interval_minutes = normalizeEngagementIntervalMinutes(
+      payload.engagement_interval_minutes ?? 60
+    );
     logger.api('webhook_trigger_called', { type: 'like_comment', userId: user.id, url: LIKE_COMMENT_WEBHOOK });
     const axios = (await import('axios')).default;
     const axRes = await axios.post(LIKE_COMMENT_WEBHOOK, payload, {
@@ -1188,6 +1192,9 @@ app.post('/api/automation/trigger-reply-comments', async (req, res) => {
     if (!payload || payload.user_id !== user.id) {
       return res.status(400).json({ error: 'Invalid payload or user_id mismatch' });
     }
+    payload.reply_interval_minutes = normalizeEngagementIntervalMinutes(
+      payload.reply_interval_minutes ?? 60
+    );
     logger.api('webhook_trigger_called', { type: 'reply_comments', userId: user.id, url: REPLY_WEBHOOK });
     const axios = (await import('axios')).default;
     const axRes = await axios.post(REPLY_WEBHOOK, payload, {
